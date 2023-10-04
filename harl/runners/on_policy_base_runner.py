@@ -105,11 +105,11 @@ class OnPolicyBaseRunner:
             self.actor.append(agent)
             for agent_id in range(1, self.num_agents):
                 assert (
-                    self.envs.observation_space[agent_id]
-                    == self.envs.observation_space[0]
+                        self.envs.observation_space[agent_id]
+                        == self.envs.observation_space[0]
                 ), "Agents have heterogeneous observation spaces, parameter sharing is not valid."
                 assert (
-                    self.envs.action_space[agent_id] == self.envs.action_space[0]
+                        self.envs.action_space[agent_id] == self.envs.action_space[0]
                 ), "Agents have heterogeneous action spaces, parameter sharing is not valid."
                 self.actor.append(self.actor[0])
         else:
@@ -177,9 +177,9 @@ class OnPolicyBaseRunner:
         self.warmup()
 
         episodes = (
-            int(self.algo_args["train"]["num_env_steps"])
-            // self.algo_args["train"]["episode_length"]
-            // self.algo_args["train"]["n_rollout_threads"]
+                int(self.algo_args["train"]["num_env_steps"])
+                // self.algo_args["train"]["episode_length"]
+                // self.algo_args["train"]["n_rollout_threads"]
         )
 
         self.logger.init(episodes)  # logger callback at the beginning of training
@@ -275,8 +275,8 @@ class OnPolicyBaseRunner:
             self.actor_buffer[agent_id].obs[0] = obs[:, agent_id].copy()
             if self.actor_buffer[agent_id].available_actions is not None:
                 self.actor_buffer[agent_id].available_actions[0] = available_actions[
-                    :, agent_id
-                ].copy()
+                                                                   :, agent_id
+                                                                   ].copy()
         if self.state_type == "EP":
             self.critic_buffer.share_obs[0] = share_obs[:, 0].copy()
         elif self.state_type == "FP":
@@ -346,7 +346,7 @@ class OnPolicyBaseRunner:
             share_obs,  # (n_threads, n_agents, share_obs_dim)
             rewards,  # (n_threads, n_agents, 1)
             dones,  # (n_threads, n_agents)
-            infos,  # type: list, shape: (n_threads, n_agents)
+            infos,  ## type: list, shape: (n_threads, n_agents)
             available_actions,  # (n_threads, ) of None or (n_threads, n_agents, action_number)
             values,  # EP: (n_threads, dim), FP: (n_threads, n_agents, dim)
             actions,  # (n_threads, n_agents, action_dim)
@@ -358,7 +358,7 @@ class OnPolicyBaseRunner:
         dones_env = np.all(dones, axis=1)  # if all agents are done, then env is done
         rnn_states[
             dones_env == True
-        ] = np.zeros(  # if env is done, then reset rnn_state to all zero
+            ] = np.zeros(  # if env is done, then reset rnn_state to all zero
             (
                 (dones_env == True).sum(),
                 self.num_agents,
@@ -413,7 +413,7 @@ class OnPolicyBaseRunner:
                 [
                     [0.0]
                     if "bad_transition" in info[0].keys()
-                    and info[0]["bad_transition"] == True
+                       and info[0]["bad_transition"] == True
                     else [1.0]
                     for info in infos
                 ]
@@ -424,7 +424,7 @@ class OnPolicyBaseRunner:
                     [
                         [0.0]
                         if "bad_transition" in info[agent_id].keys()
-                        and info[agent_id]["bad_transition"] == True
+                           and info[agent_id]["bad_transition"] == True
                         else [1.0]
                         for agent_id in range(self.num_agents)
                     ]
@@ -559,7 +559,7 @@ class OnPolicyBaseRunner:
 
             eval_rnn_states[
                 eval_dones_env == True
-            ] = np.zeros(  # if env is done, then reset rnn_state to all zero
+                ] = np.zeros(  # if env is done, then reset rnn_state to all zero
                 (
                     (eval_dones_env == True).sum(),
                     self.num_agents,

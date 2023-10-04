@@ -26,126 +26,207 @@ The following figure is an illustration of the *sequential update scheme*
 For more details, please refer to our [HARL](http://arxiv.org/abs/2304.09870) and [MEHAML](https://arxiv.org/abs/2306.10715) papers.
 
 
-## Installation
+[//]: # (## Installation)
 
-### Install HARL
+[//]: # ()
+[//]: # (### Install HARL)
 
-```shell
-conda create -n harl python=3.8
-conda activate harl
-# Install pytorch>=1.9.0 (CUDA>=11.0) manually
-git clone https://github.com/PKU-MARL/HARL.git
-cd HARL
-pip install -e .
-```
+[//]: # ()
+[//]: # (```shell)
 
+[//]: # (conda create -n harl python=3.8)
 
+[//]: # (conda activate harl)
 
-### Install Environments Dependencies
+[//]: # (# Install pytorch>=1.9.0 &#40;CUDA>=11.0&#41; manually)
 
-Along with HARL algorithms, we also implement the interfaces for seven common environments ([SMAC](https://github.com/oxwhirl/smac), [SMACv2](https://github.com/oxwhirl/smacv2), [MAMuJoCo](https://github.com/schroederdewitt/multiagent_mujoco), [MPE](https://pettingzoo.farama.org/environments/mpe/), [Google Research Football](https://github.com/google-research/football), [Bi-DexterousHands](https://github.com/PKU-MARL/DexterousHands), [Light Aircraft Game](https://github.com/liuqh16/CloseAirCombat)) and they can be used directly. (We also implement the interface for [Gym](https://www.gymlibrary.dev/). Gym is a single-agent environment, which can be seen as a special case of multi-agent environments. It is included mainly for reference purposes.) You may choose to install the dependencies to the environments you want to use.
+[//]: # (git clone https://github.com/PKU-MARL/HARL.git)
 
-**Install Dependencies of Bi-DexterousHands**
+[//]: # (cd HARL)
 
-Bi-DexterousHands depend on IsaacGym. The hardware requirements of IsaacGym has to be satisfied. To install IsaacGym, download IsaacGym Preview 4 release from [its official website](https://developer.nvidia.com/isaac-gym/download). Then run `pip install -e .` under its `python` folder.
+[//]: # (pip install -e .)
 
-**Install Light Aircraft Game**
-
-[Light Aircraft Game](https://github.com/liuqh16/CloseAirCombat) (LAG) is a recently developed cooperative-competitive environment for red and blue aircraft games, offering various settings such as single control, 1v1, and 2v2 scenarios. In the context of multi-agent scenarios, LAG currently supports self-play only for 2v2 settings. To address this limitation, we introduce novel cooperative non-weapon and shoot-missile tasks where two agents collaborate to combat two opponents controlled by the built-in AI. In the non-weapon task, agents are trained to fly towards the opponents' tails while maintaining a suitable distance. In the shoot-missile task, agents learn to dodge opponent missiles and launch their own missiles to destroy the opponents.
-
-To install LAG, run the following command:
-```shell
-# Install dependencies
-pip install torch pymap3d jsbsim==1.1.6 geographiclib gym==0.21.0 wandb icecream setproctitle
-# Initialize submodules(*JSBSim-Team/jsbsim*)
-git submodule init
-git submodule update
-```
-
-**Install Google Research Football**
-
-Please follow [the official instructions](https://github.com/google-research/football) to install Google Research Football.
-
-**Install SMAC**
-
-Please follow [the official instructions](https://github.com/oxwhirl/smac) to install SMAC.
-
-**Install SMACv2**
-
-Please follow [the official instructions](https://github.com/oxwhirl/smacv2) to install SMACv2.
-
-**Install MPE**
-
-```shell
-pip install pettingzoo==1.22.2
-pip install supersuit==3.7.0
-```
-
-**Install Gym Suite (Except MuJoCo)**
-
-```shell
-# Install gym
-pip install gym
-# Install classic control
-pip install gym[classic_control]
-# Install box2d
-conda install -c anaconda swig
-pip install gym[box2d]
-# Install atari
-pip install --upgrade pip setuptools wheel
-pip install opencv-python
-pip install atari-py
-pip install gym[atari]
-pip install autorom[accept-rom-license]
-```
-
-**Install MuJoCo**
-
-First, follow the instructions on https://github.com/openai/mujoco-py, https://www.roboti.us/, and https://github.com/deepmind/mujoco to download the right version of mujoco you need.
-
-Second, `mkdir ~/.mujoco`.
-
-Third, move the .tar.gz or .zip to `~/.mujoco`, and extract it using `tar -zxvf` or `unzip`.
-
-Fourth, add the following line to the `.bashrc`:
-
-```shell
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/<user>/.mujoco/<folder-name, e.g. mujoco210, mujoco-2.2.1>/bin
-```
-
-Fifth, run the following command:
-
-```shell
-sudo apt install libosmesa6-dev libgl1-mesa-glx libglfw3
-pip install mujoco
-pip install gym[mujoco]
-sudo apt-get update -y
-sudo apt-get install -y patchelf
-```
-
-**Install Dependencies of MAMuJoCo**
-
-First follow the instructions above to install MuJoCo. Then run the following commands.
-
-```shell
-pip install "mujoco-py>=2.1.2.14"
-pip install "Jinja2>=3.0.3"
-pip install "glfw>=2.5.1"
-pip install "Cython>=0.29.28"
-```
+[//]: # (```)
 
 
 
-### Solve Dependencies
+[//]: # (### Install Environments Dependencies)
 
-After the installation above, run the following commands to solve dependencies.
+[//]: # ()
+[//]: # (Along with HARL algorithms, we also implement the interfaces for seven common environments &#40;[SMAC]&#40;https://github.com/oxwhirl/smac&#41;, [SMACv2]&#40;https://github.com/oxwhirl/smacv2&#41;, [MAMuJoCo]&#40;https://github.com/schroederdewitt/multiagent_mujoco&#41;, [MPE]&#40;https://pettingzoo.farama.org/environments/mpe/&#41;, [Google Research Football]&#40;https://github.com/google-research/football&#41;, [Bi-DexterousHands]&#40;https://github.com/PKU-MARL/DexterousHands&#41;, [Light Aircraft Game]&#40;https://github.com/liuqh16/CloseAirCombat&#41;&#41; and they can be used directly. &#40;We also implement the interface for [Gym]&#40;https://www.gymlibrary.dev/&#41;. Gym is a single-agent environment, which can be seen as a special case of multi-agent environments. It is included mainly for reference purposes.&#41; You may choose to install the dependencies to the environments you want to use.)
 
-```shell
-pip install gym==0.21.0
-pip install pyglet==1.5.0
-pip install importlib-metadata==4.13.0
-```
+[//]: # ()
+[//]: # (**Install Dependencies of Bi-DexterousHands**)
 
+[//]: # ()
+[//]: # (Bi-DexterousHands depend on IsaacGym. The hardware requirements of IsaacGym has to be satisfied. To install IsaacGym, download IsaacGym Preview 4 release from [its official website]&#40;https://developer.nvidia.com/isaac-gym/download&#41;. Then run `pip install -e .` under its `python` folder.)
+
+[//]: # ()
+[//]: # (**Install Light Aircraft Game**)
+
+[//]: # ()
+[//]: # ([Light Aircraft Game]&#40;https://github.com/liuqh16/CloseAirCombat&#41; &#40;LAG&#41; is a recently developed cooperative-competitive environment for red and blue aircraft games, offering various settings such as single control, 1v1, and 2v2 scenarios. In the context of multi-agent scenarios, LAG currently supports self-play only for 2v2 settings. To address this limitation, we introduce novel cooperative non-weapon and shoot-missile tasks where two agents collaborate to combat two opponents controlled by the built-in AI. In the non-weapon task, agents are trained to fly towards the opponents' tails while maintaining a suitable distance. In the shoot-missile task, agents learn to dodge opponent missiles and launch their own missiles to destroy the opponents.)
+
+[//]: # ()
+[//]: # (To install LAG, run the following command:)
+
+[//]: # (```shell)
+
+[//]: # (# Install dependencies)
+
+[//]: # (pip install torch pymap3d jsbsim==1.1.6 geographiclib gym==0.21.0 wandb icecream setproctitle)
+
+[//]: # (# Initialize submodules&#40;*JSBSim-Team/jsbsim*&#41;)
+
+[//]: # (git submodule init)
+
+[//]: # (git submodule update)
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (**Install Google Research Football**)
+
+[//]: # ()
+[//]: # (Please follow [the official instructions]&#40;https://github.com/google-research/football&#41; to install Google Research Football.)
+
+[//]: # ()
+[//]: # (**Install SMAC**)
+
+[//]: # ()
+[//]: # (Please follow [the official instructions]&#40;https://github.com/oxwhirl/smac&#41; to install SMAC.)
+
+[//]: # ()
+[//]: # (**Install SMACv2**)
+
+[//]: # ()
+[//]: # (Please follow [the official instructions]&#40;https://github.com/oxwhirl/smacv2&#41; to install SMACv2.)
+
+[//]: # ()
+[//]: # (**Install MPE**)
+
+[//]: # ()
+[//]: # (```shell)
+
+[//]: # (pip install pettingzoo==1.22.2)
+
+[//]: # (pip install supersuit==3.7.0)
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (**Install Gym Suite &#40;Except MuJoCo&#41;**)
+
+[//]: # ()
+[//]: # (```shell)
+
+[//]: # (# Install gym)
+
+[//]: # (pip install gym)
+
+[//]: # (# Install classic control)
+
+[//]: # (pip install gym[classic_control])
+
+[//]: # (# Install box2d)
+
+[//]: # (conda install -c anaconda swig)
+
+[//]: # (pip install gym[box2d])
+
+[//]: # (# Install atari)
+
+[//]: # (pip install --upgrade pip setuptools wheel)
+
+[//]: # (pip install opencv-python)
+
+[//]: # (pip install atari-py)
+
+[//]: # (pip install gym[atari])
+
+[//]: # (pip install autorom[accept-rom-license])
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (**Install MuJoCo**)
+
+[//]: # ()
+[//]: # (First, follow the instructions on https://github.com/openai/mujoco-py, https://www.roboti.us/, and https://github.com/deepmind/mujoco to download the right version of mujoco you need.)
+
+[//]: # ()
+[//]: # (Second, `mkdir ~/.mujoco`.)
+
+[//]: # ()
+[//]: # (Third, move the .tar.gz or .zip to `~/.mujoco`, and extract it using `tar -zxvf` or `unzip`.)
+
+[//]: # ()
+[//]: # (Fourth, add the following line to the `.bashrc`:)
+
+[//]: # ()
+[//]: # (```shell)
+
+[//]: # (export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/<user>/.mujoco/<folder-name, e.g. mujoco210, mujoco-2.2.1>/bin)
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (Fifth, run the following command:)
+
+[//]: # ()
+[//]: # (```shell)
+
+[//]: # (sudo apt install libosmesa6-dev libgl1-mesa-glx libglfw3)
+
+[//]: # (pip install mujoco)
+
+[//]: # (pip install gym[mujoco])
+
+[//]: # (sudo apt-get update -y)
+
+[//]: # (sudo apt-get install -y patchelf)
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (**Install Dependencies of MAMuJoCo**)
+
+[//]: # ()
+[//]: # (First follow the instructions above to install MuJoCo. Then run the following commands.)
+
+[//]: # ()
+[//]: # (```shell)
+
+[//]: # (pip install "mujoco-py>=2.1.2.14")
+
+[//]: # (pip install "Jinja2>=3.0.3")
+
+[//]: # (pip install "glfw>=2.5.1")
+
+[//]: # (pip install "Cython>=0.29.28")
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # ()
+[//]: # ()
+[//]: # (### Solve Dependencies)
+
+[//]: # ()
+[//]: # (After the installation above, run the following commands to solve dependencies.)
+
+[//]: # ()
+[//]: # (```shell)
+
+[//]: # (pip install gym==0.21.0)
+
+[//]: # (pip install pyglet==1.5.0)
+
+[//]: # (pip install importlib-metadata==4.13.0)
+
+[//]: # (```)
+
+[//]: # ()
 
 
 ## Usage
@@ -156,7 +237,12 @@ To train an algorithm on a provided environment, users can modify yaml configura
 
 During training, users receive continuous logging feedback in the terminal.
 
-After training, users can check the log file, tensorboard output, experiment configuration, and saved models under the generated `results` folder. Moreover, users can also render the trained models by setting `use_render: True`, `model_dir: <path to trained models>` in algorithm configuration file (for football users also need to set `render: True` in the environment configuration file), and use the same training command as above again. For SMAC and SMACv2, rendering comes in the form of video replay automatically saved to the `StarCraftII/Replays` folder (more details can be found [here](https://github.com/oxwhirl/smac#saving-and-watching-starcraft-ii-replays)).
+After training, users can check the log file, tensorboard output, experiment configuration, and saved models under the generated `results` folder.
+`tensorboard --logdir .`
+
+Moreover, users can also render the trained models by setting `use_render: True`, `model_dir: <path to trained models>` in algorithm configuration file 
+
+[//]: # (&#40;for football users also need to set `render: True` in the environment configuration file&#41;, and use the same training command as above again. For SMAC and SMACv2, rendering comes in the form of video replay automatically saved to the `StarCraftII/Replays` folder &#40;more details can be found [here]&#40;https://github.com/oxwhirl/smac#saving-and-watching-starcraft-ii-replays&#41;&#41;.)
 
 To enable batch running, we allow users to modify yaml configs in the command line. For each training command, users specify the special parameters in the commands with the same names as in the config files. For example, if you want to run HAPPO on SMAC tasks under three random seeds. You can customize the configs and replace `train.sh` with the following commands:
 

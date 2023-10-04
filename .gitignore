@@ -1,7 +1,7 @@
 ##### Project Specification #####
-**/results/**
+#**/results/**
 .VSCodeCounter/
-
+**/trash_for_debug/**
 ##### Python.gitignore #####
 # Byte-compiled / optimized / DLL files
 __pycache__/

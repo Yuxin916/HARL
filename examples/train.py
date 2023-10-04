@@ -3,6 +3,19 @@ import argparse
 import json
 from harl.utils.configs_tools import get_defaults_yaml_args, update_args
 
+"""
+python train.py --algo <ALGO> --env <ENV> --exp_name <EXPERIMENT NAME> or 
+python train.py --load_config <CONFIG FILE PATH>
+
+for example: 
+python train.py --load_config /home/tsaisplus/Codes/HARL/tuned_configs/pettingzoo_mpe/simple_spread_v2-continuous/mappo/config.json
+
+share_observation_space:  [Box(-inf, inf, (54,), float32), Box(-inf, inf, (54,), float32), Box(-inf, inf, (54,), float32)]
+observation_space:  [Box(-inf, inf, (18,), float32), Box(-inf, inf, (18,), float32), Box(-inf, inf, (18,), float32)]
+action_space:  [Box(0.0, 1.0, (5,), float32), Box(0.0, 1.0, (5,), float32), Box(0.0, 1.0, (5,), float32)]
+
+
+"""
 
 def main():
     """Main function."""

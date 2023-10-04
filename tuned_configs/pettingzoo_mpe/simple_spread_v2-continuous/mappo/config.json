@@ -32,7 +32,7 @@
             "use_eval": true
         },
         "logger": {
-            "log_dir": "./results"
+            "log_dir": "./trash_for_debug"
         },
         "model": {
             "activation_func": "relu",
