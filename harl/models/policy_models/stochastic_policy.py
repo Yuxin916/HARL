@@ -27,6 +27,7 @@ class StochasticPolicy(nn.Module):
         self.use_policy_active_masks = args["use_policy_active_masks"]
         self.use_naive_recurrent_policy = args["use_naive_recurrent_policy"]
         self.use_recurrent_policy = args["use_recurrent_policy"]
+        # number of recurrent layers
         self.recurrent_n = args["recurrent_n"]
         self.tpdv = dict(dtype=torch.float32, device=device)
 

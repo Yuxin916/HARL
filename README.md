@@ -233,7 +233,16 @@ For more details, please refer to our [HARL](http://arxiv.org/abs/2304.09870) an
 
 ### Training on Existing Environments
 
-To train an algorithm on a provided environment, users can modify yaml configuration files of the corresponding algorithm and environment under `harl/configs/algos_cfgs` and `harl/configs/envs_cfgs` as they wish, go to `examples` folder, and then start training with a one-liner `python train.py --algo <ALGO> --env <ENV> --exp_name <EXPERIMENT NAME>` or `python train.py --load_config <CONFIG FILE PATH>`, where the latter is mostly used when reproducing an experiment. We provide the **tuned configurations** for algorithms in each environments under `tuned_configs` folder. Users can **reproduce our results** by using `python train.py --load_config <TUNED CONFIG PATH>` and change `<TUNED CONFIG PATH>` to the absolute path of the tuned config file on their machine.
+To train an algorithm on a provided environment, users can modify yaml configuration files of the corresponding algorithm and environment under 
+`harl/configs/algos_cfgs` and `harl/configs/envs_cfgs` as they wish, 
+go to `examples` folder, and then start training with a one-liner 
+`python train.py --algo <ALGO> --env <ENV> --exp_name <EXPERIMENT NAME>` 
+or `python train.py --load_config <CONFIG FILE PATH> --exp_name <EXPERIMENT NAME>`, 
+where the latter is mostly used when reproducing an experiment. 
+We provide the **tuned configurations** for algorithms in each environments under `tuned_configs` folder. 
+Users can **reproduce our results** by using 
+`python train.py --load_config <TUNED CONFIG PATH> --exp_name <EXPERIMENT NAME>` 
+and change `<TUNED CONFIG PATH>` to the absolute path of the tuned config file on their machine.
 
 During training, users receive continuous logging feedback in the terminal.
 

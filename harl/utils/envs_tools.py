@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from harl.envs.env_wrappers import ShareSubprocVecEnv, ShareDummyVecEnv
 
+DEBUG= True
 
 def check(value):
     """Check if value is a numpy array, if so, convert it to a torch tensor."""
@@ -93,8 +94,10 @@ def make_train_env(env_name, seed, n_threads, env_args):
                 from harl.envs.lag.lag_env import LAGEnv
 
                 env = LAGEnv(env_args)
-            elif env_name == "AST":
-                print('TODO: AST')
+            elif env_name == "ast":
+                from harl.envs.ast.ast_env import ASTEnv
+
+                env = ASTEnv(env_args)
             else:
                 print("Can not support the " + env_name + "environment.")
                 raise NotImplementedError
@@ -102,7 +105,8 @@ def make_train_env(env_name, seed, n_threads, env_args):
             return env
 
         return init_env
-
+    if DEBUG:
+        test = get_env_fn(0)()
     if n_threads == 1:
         return ShareDummyVecEnv([get_env_fn(0)])
     else:

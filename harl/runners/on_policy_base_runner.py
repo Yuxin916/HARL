@@ -92,6 +92,7 @@ class OnPolicyBaseRunner:
         print("share_observation_space: ", self.envs.share_observation_space)
         print("observation_space: ", self.envs.observation_space)
         print("action_space: ", self.envs.action_space)
+        print("num_agents: ", self.num_agents)
 
         # actor
         if self.share_param:

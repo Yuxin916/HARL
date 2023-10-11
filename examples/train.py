@@ -8,13 +8,17 @@ python train.py --algo <ALGO> --env <ENV> --exp_name <EXPERIMENT NAME> or
 python train.py --load_config <CONFIG FILE PATH>
 
 for example: 
-python train.py --load_config /home/tsaisplus/Codes/HARL/tuned_configs/pettingzoo_mpe/simple_spread_v2-continuous/mappo/config.json
+python train.py --algo mappo --env lag --exp_name lag_mappo
+python train.py --algo mappo --env pettingzoo_mpe --exp_name mpe_mappo
+python train.py --load_config /home/tsaisplus/MuRPE_base/Heterogenous-MARL/tuned_configs/pettingzoo_mpe/simple_spread_v2-continuous/mappo/config.json
 
+eg:
 share_observation_space:  [Box(-inf, inf, (54,), float32), Box(-inf, inf, (54,), float32), Box(-inf, inf, (54,), float32)]
 observation_space:  [Box(-inf, inf, (18,), float32), Box(-inf, inf, (18,), float32), Box(-inf, inf, (18,), float32)]
 action_space:  [Box(0.0, 1.0, (5,), float32), Box(0.0, 1.0, (5,), float32), Box(0.0, 1.0, (5,), float32)]
 
-
+my env: 
+python train.py --algo mappo --env ast --exp_name ast_mappo
 """
 
 def main():
@@ -52,8 +56,9 @@ def main():
             "dexhands",
             "smacv2",
             "lag",
+            "ast",
         ],
-        help="Environment name. Choose from: smac, mamujoco, pettingzoo_mpe, gym, football, dexhands, smacv2, lag.",
+        help="Environment name. Choose from: smac, mamujoco, pettingzoo_mpe, gym, football, dexhands, smacv2, lag, ast.",
     )
     parser.add_argument(
         "--exp_name", type=str, default="installtest", help="Experiment name."

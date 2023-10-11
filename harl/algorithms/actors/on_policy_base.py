@@ -15,6 +15,7 @@ class OnPolicyBase:
             device: (torch.device) device to use for tensor operations.
         """
         # save arguments
+        # "model" and "algo" sections in $Algorithm config file
         self.args = args
         self.device = device
         self.tpdv = dict(dtype=torch.float32, device=device)

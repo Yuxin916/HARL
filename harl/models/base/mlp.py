@@ -17,17 +17,20 @@ class MLPLayer(nn.Module):
 
         active_func = get_active_func(activation_func)
         init_method = get_init_method(initialization_method)
+        # 调整权重的尺度，以确保层中的激活在训练期间不会变得太小（梯度消失）或太大（梯度爆炸）
         gain = nn.init.calculate_gain(activation_func)
 
         def init_(m):
             return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain=gain)
 
+        # 创建第一个隐藏层(include len(obs))
         layers = [
             init_(nn.Linear(input_dim, hidden_sizes[0])),
             active_func,
             nn.LayerNorm(hidden_sizes[0]),
         ]
 
+        # 循环，用于创建多个隐藏层
         for i in range(1, len(hidden_sizes)):
             layers += [
                 init_(nn.Linear(hidden_sizes[i - 1], hidden_sizes[i])),

@@ -1,0 +1,97 @@
+seed: 0
+epsilon: 0.0
+
+######Terrain###############
+terrain: null
+terrain_x: 2428
+terrain_y: 2428
+#terrain_map: Prison_Escape/environment/forest_coverage/map_set/0.npy
+#terrain_map: Prison_Escape/environment/forest_coverage/maps_0.2/7.npy
+terrain_map:
+percent_dense: 0.0  # FIXED, no dense forest now
+percent_mountain: 0.0  # FIXED, no mountain now
+mountain_locations:  # FIXED, no mountain now, as in the mountain density is 0
+   - 400, 300
+#  - 1600, 1800
+
+
+######Camera###############
+random_cameras: False # FIXED. whether to use random cameras or not
+num_random_known_cameras: 5  # Blue color [known to evader]
+num_random_unknown_cameras: 0  # Red color [unknown to evader]
+#camera_file_path: /home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/camera_locations/camera_n_percentage/10_percent_cameras.txt
+camera_file_path: /home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/camera_locations/test.txt
+camera_range_factor: 1.0  # FIXED. a multiplier of detection due to detection device type. eg, camera = 1, helicopter = 0.5, search party = 0.75
+camera_range: 100  # FIXED. the range of the camera, how the camera generated
+camera_net_bool: False # FIXED. whether to use the camera net around the evader or not
+camera_net_path: null # FIXED. the path to the camera net file
+
+######Pursuer Team##############
+num_search_parties: 3  # FIXED number of ground catcher
+num_helicopters: 1  # FIXED number of air sensor
+search_party_speed: 20  # speed of ground catcher
+helicopter_speed: 20  # speed of air sensor
+helicopter_battery_life: 4320 # FIXED. No battery die. how many minutes the helicopter can last in the game
+helicopter_recharge_time: 40 # how many minutes the helicopter need to recharge itself
+random_init_positions: False # FIXED. whether to use random initial positions or not
+helicopter_init_pos: [80, 80]
+search_party_init_pos: [[200, 200], [200, 1800], [1800, 200]]
+
+######Evader Team##############
+spawn_mode: normal # FIXED evader initial position
+  # normal: 2400, 2400
+  # uniform: uniformly sampled random location
+  # uniform_hideout_dist: min_distance_from_hideout_to_start from the hideouts
+  # hideout: within `spawn_range` of the hideouts
+  # corner: northeast corner +- spawn_range
+spawn_range: 350  # FIXED (does not matter)
+min_distance_from_hideout_to_start: 1000  # FIXED (does not matter)
+prisoner_init_pos: [2400, 2400]  # FIXED
+
+# Observation
+#If there exits dense forest, the embedding is necessary. All 1 for woods
+observation_terrain_feature: False  # FIXED. No need to embed the terrain features
+include_camera_at_start: False # FIXED
+include_start_location_blue_obs: True # FIXED. whether to include the evader's initial position in the blue obs
+store_last_k_fugitive_detections: True # FIXED
+
+#others
+step_reset: True # TODO: what is this?
+detection_factor: 4.0  # FIXED. not important.
+# Prisoner-Low: 3.0, Prisoner-Mod: 4.0, Prisoner-High: 7.0
+
+######Hideout##############
+num_known_hideouts: 1 # FIXED
+num_unknown_hideouts: 1 # FIXED
+hideout_radius: 50 # FIXED
+random_hideout_locations: False  # FIXED
+#If True, hideouts are placed randomly with specified numbers
+#If False, hideouts are selected from below based on the specified numbers
+
+known_hideout_locations: # to pursuers teams -- like camera. FIXED
+#  - 323, 1623
+#  - 1804, 737
+#  - 317, 2028
+#  - 819, 1615
+#  - 1145, 182
+#  - 1304, 624
+#  - 234, 171
+#  - 2398, 434
+#  - 633, 2136
+#  - 1590, 2
+  - 150, 2200
+
+unknown_hideout_locations: # to pursuers teams. FIXED
+#  - 376, 1190
+#  - 909, 510
+#  - 397, 798
+#  - 2059, 541
+#  - 2011, 103
+#  - 901, 883
+#  - 1077, 1445
+#  - 602, 372
+#  - 100, 100
+#  - 279, 477
+  - 150, 400
+
+
