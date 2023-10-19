@@ -32,6 +32,7 @@ def load_environment(data):
         num_random_unknown_cameras=data['num_random_unknown_cameras'],
         camera_file_path=data['camera_file_path'],
         camera_range_factor=data['camera_range_factor'],
+        camera_range=data['camera_range'],
         camera_net_bool=data['camera_net_bool'],
         camera_net_path=data['camera_net_path'],
 

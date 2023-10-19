@@ -270,6 +270,10 @@ class OnPolicyBaseRunner:
     def warmup(self):
         """Warm up the replay buffer."""
         # reset env
+        """
+        obs: (n_threads, n_agents, obs_dim)
+        share_obs: (n_threads, n_agents, share_obs_dim)
+        """
         obs, share_obs, available_actions = self.envs.reset()
         # replay buffer
         for agent_id in range(self.num_agents):

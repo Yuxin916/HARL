@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 
-raw_env_path = "/home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/configs/mytest.yaml"
+raw_env_path = "/home/tsaisplus/MuRPE_base/Heterogenous-MARL/harl/configs/envs_cfgs/ast.yaml"
 import yaml
 with open(raw_env_path, 'r') as stream:
     data = yaml.safe_load(stream)

@@ -9,7 +9,7 @@ from Prison_Escape.environment.prisoner_perspective_envs import PrisonerBlueEnv
 from Prison_Escape.fugitive_policies.a_star_avoid import AStarAdversarialAvoid
 
 # pursuer策略
-# from blue_policies.heuristic import BlueHeuristic
+from Prison_Escape.blue_policies.heuristic import BlueHeuristic
 from Prison_Escape.blue_policies.random_multi_discrete import create_random_policy
 
 # 其他
@@ -17,8 +17,7 @@ import numpy as np
 
 
 # config for raw env
-raw_env_path = "/home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/configs/mytest.yaml"
-
+raw_env_path = "/home/tsaisplus/MuRPE_base/Heterogenous-MARL/harl/configs/envs_cfgs/ast.yaml"
 # 原始环境
 raw_env = load_environment(raw_env_path)
 
@@ -83,7 +82,7 @@ if DEBUG:
 # gnn_obs, blue_obs = env.reset()
 
 
-blue_obs = env.reset()
+blue_obs, blue_state = env.reset()
 
 # # what MARL should do. now use Heuristic policy for blue
 # blue_policy = BlueHeuristic(env, debug=False)
@@ -96,13 +95,14 @@ blue_obs = env.reset()
 for i in range(1000):
     # blue_actions = blue_policy.predict(blue_obs)
     # blue_actions = [np.array([0.0, 1.0, 15]), np.array([0.0, 1.0, 15]), np.array([0.0, 1.0, 15]), np.array([0.0, 1.0, 127])]
-    # blue_actions = [np.array([20, 20]), np.array([20, 20]), np.array([20, 20]), np.array([20, 20])]
-    blue_actions = create_random_policy(env.num_agents,
-                                       action_dim=2,
-                                       min_action=-100,
-                                       max_action=100)
+    # blue_actions = [np.array([0, 0]), np.array([3, 16]), np.array([5, 9]), np.array([18, 18])]
+    blue_actions = [np.array([0]), np.array([4]), np.array([7]), np.array([5])]
+    # blue_actions = create_random_policy(env.num_agents,
+    #                                    action_dim=2,
+    #                                    min_action=-100,
+    #                                    max_action=100)
 
-    blue_obs, reward, done, _ = env.step(blue_actions)
+    blue_obs, share_obs, reward, done, info = env.step(blue_actions)
     # print("blue_obs", blue_obs)
     env.render('heuristic',
                show=True,
@@ -111,6 +111,10 @@ for i in range(1000):
                show_delta=True,  # show a square around evader
                show_grid=True  # show grid
                )
+    if done[0]:
+        env.reset()
+    else:
+        pass
 
-    pass
+    print(i)
 

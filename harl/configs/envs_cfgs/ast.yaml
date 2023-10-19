@@ -22,7 +22,7 @@ random_cameras: False # FIXED. whether to use random cameras or not
 num_random_known_cameras: 5  # Blue color [known to evader]
 num_random_unknown_cameras: 0  # Red color [unknown to evader]
 #camera_file_path: /home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/camera_locations/camera_n_percentage/10_percent_cameras.txt
-camera_file_path: /home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/camera_locations/test.txt
+camera_file_path: /home/tsaisplus/MuRPE_base/Heterogenous-MARL/harl/envs/ast/Prison_Escape/environment/camera_locations/test.txt
 camera_range_factor: 1.0  # FIXED. a multiplier of detection due to detection device type. eg, camera = 1, helicopter = 0.5, search party = 0.75
 camera_range: 100  # FIXED. the range of the camera, how the camera generated
 camera_net_bool: False # FIXED. whether to use the camera net around the evader or not
@@ -36,8 +36,8 @@ helicopter_speed: 20  # speed of air sensor
 helicopter_battery_life: 4320 # FIXED. No battery die. how many minutes the helicopter can last in the game
 helicopter_recharge_time: 40 # how many minutes the helicopter need to recharge itself
 random_init_positions: False # FIXED. whether to use random initial positions or not
-helicopter_init_pos: [80, 80]
-search_party_init_pos: [[200, 200], [200, 1800], [1800, 200]]
+helicopter_init_pos: [2364, 2400]
+search_party_init_pos: [[1916, 1916], [1500, 1500], [2352, 2400]]
 
 ######Evader Team##############
 spawn_mode: normal # FIXED evader initial position
@@ -58,9 +58,8 @@ include_start_location_blue_obs: True # FIXED. whether to include the evader's i
 store_last_k_fugitive_detections: True # FIXED
 
 #others
-step_reset: True # TODO: what is this?
-detection_factor: 4.0  # FIXED. not important.
-# Prisoner-Low: 3.0, Prisoner-Mod: 4.0, Prisoner-High: 7.0
+step_reset: False # TODO: what is this?
+detection_factor: 60.0   # This is important. need to tune. Multiplication factor for detection range
 
 ######Hideout##############
 num_known_hideouts: 1 # FIXED

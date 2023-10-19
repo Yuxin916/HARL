@@ -51,7 +51,11 @@ class MultipleCombatEnv(BaseEnv):
         self.task.reset(self)
         obs = self.get_obs()
         share_obs = self.get_state()
-        return self._pack(obs), self._pack(share_obs)
+
+        obs_ = self._pack(obs)
+        share_obs_ = self._pack(share_obs)
+
+        return obs_, share_obs_
 
     def reset_simulators(self):
         # Assign new initial condition here!

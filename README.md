@@ -317,83 +317,142 @@ After these steps, you can apply the algorithms immediately as above.
 
 
 
-## Performance on Cooperative MARL Benchmarks
+[//]: # (## Performance on Cooperative MARL Benchmarks)
 
-### MPE
+[//]: # ()
+[//]: # (### MPE)
 
-<div align="center">
-  <img src="./assets/mpe_learning_curve.jpg" width="100%"/>
-</div>
+[//]: # ()
+[//]: # (<div align="center">)
 
-### MAMuJoCo
+[//]: # (  <img src="./assets/mpe_learning_curve.jpg" width="100%"/>)
 
-HAPPO and HADDPG outperforms MAPPO and MADDPG; HAPPO and HATD3 are the most effective methods for heterogeneous-agent cooperation tasks.
+[//]: # (</div>)
 
-<div align="center">
-  <img src="./assets/mamujoco_on_policy_learning_curve.jpg" width="100%"/>
-</div>
+[//]: # ()
+[//]: # (### MAMuJoCo)
 
-<div align="center">
-  <img src="./assets/mamujoco_off_policy_learning_curve.jpg" width="100%"/>
-</div>
-<div align="center">
-  <img src="./assets/Humanoid-v2_17x1_learning_curve.jpg" width="40%"/>
-</div>
+[//]: # ()
+[//]: # (HAPPO and HADDPG outperforms MAPPO and MADDPG; HAPPO and HATD3 are the most effective methods for heterogeneous-agent cooperation tasks.)
 
-### SMAC & SMACv2
+[//]: # ()
+[//]: # (<div align="center">)
 
-HAPPO and HATRPO are comparable to or better than MAPPO and QMIX in SMAC and SMACv2, demonstrating their capability in mostly homogeneous-agent settings.
+[//]: # (  <img src="./assets/mamujoco_on_policy_learning_curve.jpg" width="100%"/>)
 
-<div align="center">
-  <img src="./assets/smac-winrates.png" width="100%"/>
-</div>
+[//]: # (</div>)
 
-<div align="center">
-  <img src="./assets/smac_learning_curve.jpg" width="100%"/>
-</div>
+[//]: # ()
+[//]: # (<div align="center">)
 
-### GRF
+[//]: # (  <img src="./assets/mamujoco_off_policy_learning_curve.jpg" width="100%"/>)
 
-HAPPO consistently outperforms MAPPO and QMIX on GRF, and the performance gap increases as the number and heterogeneity of agents increase.
+[//]: # (</div>)
 
-<div align="center">
-  <img src="./assets/grf-scorerates.png" width="50%"/>
-</div>
-<div align="center">
-  <img src="./assets/football_learning_curve.jpg" width="100%"/>
-</div>
+[//]: # (<div align="center">)
 
-### Bi-DexterousHands
+[//]: # (  <img src="./assets/Humanoid-v2_17x1_learning_curve.jpg" width="40%"/>)
 
-HAPPO consistently outperforms MAPPO, and is also better than the single-agent baseline PPO, while also showing less variance.
+[//]: # (</div>)
 
-<div align="center">
-  <img src="./assets/dexhands_learning_curve.jpg" width="100%"/>
-</div>
+[//]: # ()
+[//]: # (### SMAC & SMACv2)
 
-*The experiment results of HASAC can be found at https://sites.google.com/view/mehaml*
+[//]: # ()
+[//]: # (HAPPO and HATRPO are comparable to or better than MAPPO and QMIX in SMAC and SMACv2, demonstrating their capability in mostly homogeneous-agent settings.)
 
-## Citation
+[//]: # ()
+[//]: # (<div align="center">)
 
-If you find our paper or this repository helpful in your research or project, please consider citing our works using the following BibTeX citation:
+[//]: # (  <img src="./assets/smac-winrates.png" width="100%"/>)
 
-```tex
-@misc{zhong2023heterogeneousagent,
-      title={Heterogeneous-Agent Reinforcement Learning}, 
-      author={Yifan Zhong and Jakub Grudzien Kuba and Siyi Hu and Jiaming Ji and Yaodong Yang},
-      year={2023},
-      eprint={2304.09870},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
-}
-```
-```tex
-@misc{liu2023maximum,
-      title={Maximum Entropy Heterogeneous-Agent Mirror Learning}, 
-      author={Jiarong Liu and Yifan Zhong and Siyi Hu and Haobo Fu and Qiang Fu and Xiaojun Chang and Yaodong Yang},
-      year={2023},
-      eprint={2306.10715},
-      archivePrefix={arXiv},
-      primaryClass={cs.MA}
-}
-```
+[//]: # (</div>)
+
+[//]: # ()
+[//]: # (<div align="center">)
+
+[//]: # (  <img src="./assets/smac_learning_curve.jpg" width="100%"/>)
+
+[//]: # (</div>)
+
+[//]: # ()
+[//]: # (### GRF)
+
+[//]: # ()
+[//]: # (HAPPO consistently outperforms MAPPO and QMIX on GRF, and the performance gap increases as the number and heterogeneity of agents increase.)
+
+[//]: # ()
+[//]: # (<div align="center">)
+
+[//]: # (  <img src="./assets/grf-scorerates.png" width="50%"/>)
+
+[//]: # (</div>)
+
+[//]: # (<div align="center">)
+
+[//]: # (  <img src="./assets/football_learning_curve.jpg" width="100%"/>)
+
+[//]: # (</div>)
+
+[//]: # ()
+[//]: # (### Bi-DexterousHands)
+
+[//]: # ()
+[//]: # (HAPPO consistently outperforms MAPPO, and is also better than the single-agent baseline PPO, while also showing less variance.)
+
+[//]: # ()
+[//]: # (<div align="center">)
+
+[//]: # (  <img src="./assets/dexhands_learning_curve.jpg" width="100%"/>)
+
+[//]: # (</div>)
+
+[//]: # ()
+[//]: # (*The experiment results of HASAC can be found at https://sites.google.com/view/mehaml*)
+
+[//]: # ()
+[//]: # (## Citation)
+
+[//]: # ()
+[//]: # (If you find our paper or this repository helpful in your research or project, please consider citing our works using the following BibTeX citation:)
+
+[//]: # ()
+[//]: # (```tex)
+
+[//]: # (@misc{zhong2023heterogeneousagent,)
+
+[//]: # (      title={Heterogeneous-Agent Reinforcement Learning}, )
+
+[//]: # (      author={Yifan Zhong and Jakub Grudzien Kuba and Siyi Hu and Jiaming Ji and Yaodong Yang},)
+
+[//]: # (      year={2023},)
+
+[//]: # (      eprint={2304.09870},)
+
+[//]: # (      archivePrefix={arXiv},)
+
+[//]: # (      primaryClass={cs.LG})
+
+[//]: # (})
+
+[//]: # (```)
+
+[//]: # (```tex)
+
+[//]: # (@misc{liu2023maximum,)
+
+[//]: # (      title={Maximum Entropy Heterogeneous-Agent Mirror Learning}, )
+
+[//]: # (      author={Jiarong Liu and Yifan Zhong and Siyi Hu and Haobo Fu and Qiang Fu and Xiaojun Chang and Yaodong Yang},)
+
+[//]: # (      year={2023},)
+
+[//]: # (      eprint={2306.10715},)
+
+[//]: # (      archivePrefix={arXiv},)
+
+[//]: # (      primaryClass={cs.MA})
+
+[//]: # (})
+
+[//]: # (```)

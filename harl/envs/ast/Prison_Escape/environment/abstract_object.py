@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Prison_Escape.environment.utils import distance
 
-raw_env_path = "/home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/configs/mytest.yaml"
+raw_env_path = "/home/tsaisplus/MuRPE_base/Heterogenous-MARL/harl/configs/envs_cfgs/ast.yaml"
 import yaml
 with open(raw_env_path, 'r') as stream:
     data = yaml.safe_load(stream)
@@ -389,12 +389,46 @@ class MovingObject(AbstractObject):
         assert np.issubdtype(type(self.location[1]), np.integer)
         return True
 
-    def path_v4(self, waypoint):
+    def path_v4(self, action, speed):
         """
-        输入：waypoint, ndarray(2,), dtype=int
+        输入：
+        action: ndarray(1,), dtype=int, 0-8
+        speed: 智能体往这个方向移动多少grids
+
         输出：是否成功移动
         """
         old_location = self.location.copy()
+
+        # 对discrete waypoint进行处理, 切换到真实距离的waypoint
+        if np.array_equal(np.array([0]), action):
+            # 智能体原地不动，discrete值为0
+            waypoint = np.array([0, 0])
+        elif np.array_equal(np.array([1]), action):
+            # 智能体向上移动，discrete值为1
+            waypoint = np.array([0, speed])
+        elif np.array_equal(np.array([2]), action):
+            # 智能体向下移动，discrete值为2
+            waypoint = np.array([0, -speed])
+        elif np.array_equal(np.array([3]), action):
+            # 智能体向左移动，discrete值为3
+            waypoint = np.array([-speed, 0])
+        elif np.array_equal(np.array([4]), action):
+            # 智能体向右移动，discrete值为4
+            waypoint = np.array([speed, 0])
+        elif np.array_equal(np.array([5]), action):
+            # 智能体向左上移动，discrete值为5
+            waypoint = np.array([-speed, speed])
+        elif np.array_equal(np.array([6]), action):
+            # 智能体向右上移动，discrete值为6
+            waypoint = np.array([speed, speed])
+        elif np.array_equal(np.array([7]), action):
+            # 智能体向左下移动，discrete值为7
+            waypoint = np.array([-speed, -speed])
+        elif np.array_equal(np.array([8]), action):
+            # 智能体向右下移动，discrete值为8
+            waypoint = np.array([speed, -speed])
+        else:
+            raise NotImplementedError("Given action is not valid")
 
         # 计算新位置
         new_location = np.round([old_location[0] + waypoint[0], old_location[1] + waypoint[1]]).astype(np.int)
@@ -750,7 +784,6 @@ class MovingObject(AbstractObject):
 
 
 class DetectionObject(AbstractObject):
-    detection_factor = 4.0
     def __init__(self, terrain, location,
                  detection_object_type_coefficient):
         """
@@ -758,28 +791,29 @@ class DetectionObject(AbstractObject):
         :param terrain: a terrain instance
         :param location: a list of length 2. For example, [5, 7]
         :param detection_object_type_coefficient: a multiplier of detection due to detection device type
-        (for example, camera = 1, helicopter = 0.5, search party = 0.75)
+        在这些agent被detect时的难易程度
+        camera = 1
+        helicopter = 0.5
+        search party = 0.75
+        evader = 0.8
         """
-        # self.detection_terrain_coefficient = {
-        #     TerrainType.MOUNTAIN: 1.0,
-        #     TerrainType.WOODS: 1.0,
-        #     TerrainType.DENSE_FOREST: 0.5
-        # }
         self.detection_object_type_coefficient = detection_object_type_coefficient
         AbstractObject.__init__(self, terrain, location)
 
-    def detect(self, location_object, speed_object):
+    def detect(self, location_object):
         """
-        Determine detection of an object based on its location and speed
+        Determine detection of an object based on its location
+
+        输入：被detect的object的位置, evader的位置
         :param location_object:
-        :param speed_object:
+
         :return: [b,x,y] where b is a boolean indicating detection, and [x,y] is the location of the object in world coordinates if b=True, [x,y]=[-1,-1] if b=False
         """
-        # distance from evader to searcher team member
+        # 当前object和被detect的object的距离
         distance = np.sqrt(np.square(self.location[0]-location_object[0]) + np.square(self.location[1]-location_object[1]))
 
-        # Calculate the maximum distance within which the Probability of Detection (PoD) is 100%
-        base_100_pod_distance = self.base_100_pod_distance(speed_object)
+        # 当前object PoD = 100%的最远距离/半径
+        base_100_pod_distance = self.base_100_pod_distance()
 
         # if the PoD is 100% within base_100_pod_distance
         if distance < base_100_pod_distance:
@@ -787,7 +821,7 @@ class DetectionObject(AbstractObject):
             return [1, location_object[0]/DIM_X, location_object[1]/DIM_Y]
         # if the PoD is 0% outside 3*base_100_pod_distance
         if distance > base_100_pod_distance * 3:
-            # Return not detetced
+            # Return not detected
             return [0, -1, -1]
 
         # Calculate the PoD as a linear function of distance within [base_100_pod_distance, 3*base_100_pod_distance]
@@ -800,22 +834,35 @@ class DetectionObject(AbstractObject):
         else:
             return [0, -1, -1]
 
-    @property
     def detection_range(self):
         """
         get detection range of PoD > 0 assuming the object is fast walk speed
         :return: the largest detection range of PoD > 0
         """
-        return self.base_100_pod_distance(speed=7.5) * 3
+        return self.base_100_pod_distance() * 3
 
-    def base_100_pod_distance(self, speed):
+    def base_100_pod_distance(self):
         """
-        Calculate the distance within which the Probability of Detection is 100%
-        :param speed: the speed of the detected object
+        正在做detect的object的100% PoD的距离
+
         :return: the maximum distance of 100% PoD
         """
         # cameras can detect an object within 4 grids moving with speed 1 with 100% PoD in wood
-        a = self.detection_factor * self.terrain.detection_coefficient_given_location(self.location) *  \
-            self.detection_object_type_coefficient * speed
+
+        # detection range和地图性质有关
+        map_coefficient = self.terrain.detection_coefficient_given_location(self.location)
+        assert self.terrain.detection_coefficient_given_location(self.location) == 1.0, "Detection coefficient should be 1.0, wood only"
+
+        # detetction range和被detect的object type有关 #TODO: need a check module
+            # self.detection_object_type_coefficient = 1.0 for camera  （camera很容易被发现）
+            # self.detection_object_type_coefficient = 0.5 for helicopter
+            # self.detection_object_type_coefficient = 0.75 for search party
+            # self.detection_object_type_coefficient = 0.8 for evader
+
+        # detection range和detector本身性质也有关系
+
+        # detection range和speed无关
+
+        a = self.detection_factor * map_coefficient * self.detection_object_type_coefficient
 
         return a

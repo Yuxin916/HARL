@@ -1,5 +1,6 @@
 ##### Project Specification #####
 **/results/**
+**/staged_result/**
 .VSCodeCounter/
 **/trash_for_debug/**
 ##### Python.gitignore #####

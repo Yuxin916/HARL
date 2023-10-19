@@ -56,7 +56,7 @@
         },
         "render": {
             "render_episodes": 10,
-            "use_render": false
+            "use_render": true
         },
         "seed": {
             "seed": 1,
@@ -66,7 +66,7 @@
             "episode_length": 200,
             "eval_interval": 25,
             "log_interval": 5,
-            "model_dir": null,
+            "model_dir": "/home/tsaisplus/MuRPE_base/Heterogenous-MARL/examples/results/pettingzoo_mpe/simple_spread_v2-continuous/mappo/report/seed-00001-2023-10-04-13-46-34/models",
             "n_rollout_threads": 20,
             "num_env_steps": 10000000,
             "use_linear_lr_decay": false,

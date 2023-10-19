@@ -2,15 +2,16 @@ from Prison_Escape.environment.abstract_object import MovingObject, DetectionObj
 
 
 class SearchParty(MovingObject, DetectionObject):
-    def __init__(self, terrain, location, speed):
+    def __init__(self, terrain, location, speed, detection_object_type_coefficient):
         """
         SearchParty defines search parties. Initializes detection parameters.
         :param terrain: a terrain instance
         :param location: a list of length 2. For example, [5, 7]
         :param speed: a number representing speed with unit in grids
         """
+        assert detection_object_type_coefficient == 0.8
         MovingObject.__init__(self, terrain, location, speed)
-        DetectionObject.__init__(self, terrain, location, detection_object_type_coefficient=0.75)
+        DetectionObject.__init__(self, terrain, location, detection_object_type_coefficient=detection_object_type_coefficient)
 
     @property
     def detection_range(self):
@@ -18,9 +19,9 @@ class SearchParty(MovingObject, DetectionObject):
         get detection range of PoD > 0 assuming the object is sprint walk speed
         :return: the largest detection range of PoD > 0
         """
-        return self.base_100_pod_distance(speed=15) * 3
+        return self.base_100_pod_distance() * 3
 
-    def detect(self, location_object, speed):
+    def detect(self, location_object):
         """
         Determine detection of an object based on its location and type of the object
         The search parties' detection of the fugitive is different from the fugitive's detection of the search parties
@@ -30,7 +31,7 @@ class SearchParty(MovingObject, DetectionObject):
         :return: [b,x,y] where b is a boolean indicating detection, and [x,y] is the location of the object in world
         coordinates if b=True, [x,y]=[-1,-1] if b=False
         """
-        return DetectionObject.detect(self, location_object, speed)
+        return DetectionObject.detect(self, location_object), DetectionObject.detection_range(self)
 
     def path(self, camera_list=[], camera_avoid_bool=False):
         """ Pathing for helicopter, we set the inner and outer mountain ranges to be different than other agents"""

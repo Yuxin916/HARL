@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import time
 from Prison_Escape.fugitive_policies.rrt_star_adversarial_heuristic import RRTStarAdversarial, Plotter
 
-raw_env_path = "/home/tsaisplus/MuRPE_base/Opponent-Modeling-Env/Prison_Escape/environment/configs/mytest.yaml"
+raw_env_path = "/home/tsaisplus/MuRPE_base/Heterogenous-MARL/harl/configs/envs_cfgs/ast.yaml"
 import yaml
 with open(raw_env_path, 'r') as stream:
     data = yaml.safe_load(stream)
