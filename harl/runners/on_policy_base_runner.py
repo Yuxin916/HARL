@@ -37,16 +37,19 @@ class OnPolicyBaseRunner:
         self.algo_args = algo_args
         self.env_args = env_args
 
-        self.hidden_sizes = algo_args["model"]["hidden_sizes"]
-        self.rnn_hidden_size = self.hidden_sizes[-1]
-        self.recurrent_n = algo_args["model"]["recurrent_n"]
-        self.action_aggregation = algo_args["algo"]["action_aggregation"]
-        self.state_type = env_args.get("state_type", "EP")
-        self.share_param = algo_args["algo"]["share_param"]
-        self.fixed_order = algo_args["algo"]["fixed_order"]
-        set_seed(algo_args["seed"])
-        self.device = init_device(algo_args["device"])
-        if not self.algo_args["render"]["use_render"]:  # train, not render
+        # 读取算法相关config
+        self.hidden_sizes = algo_args["model"]["hidden_sizes"]  # MLP隐藏层神经元数量
+        self.rnn_hidden_size = self.hidden_sizes[-1]  # RNN隐藏层神经元数量
+        self.recurrent_n = algo_args["model"]["recurrent_n"]  # RNN的层数
+        self.action_aggregation = algo_args["algo"]["action_aggregation"]  # TODO：这是什么
+        self.share_param = algo_args["algo"]["share_param"]  # actor是否共享参数
+        self.fixed_order = algo_args["algo"]["fixed_order"]  # TODO：这是什么
+        set_seed(algo_args["seed"])  # 设置随机种子
+        self.device = init_device(algo_args["device"])  # 设置设备
+
+        # train, not render 说明在训练，不在eval
+        if not self.algo_args["render"]["use_render"]:
+            # 初始化运行路径，日志路径，保存路径，tensorboard路径
             self.run_dir, self.log_dir, self.save_dir, self.writter = init_dir(
                 args["env"],
                 env_args,
@@ -55,14 +58,18 @@ class OnPolicyBaseRunner:
                 algo_args["seed"]["seed"],
                 logger_path=algo_args["logger"]["log_dir"],
             )
+            # 保存algo，env，args所有config
             save_config(args, algo_args, env_args, self.run_dir)
+
         # set the title of the process
+        # 设置进程的标题
         setproctitle.setproctitle(
             str(args["algo"]) + "-" + str(args["env"]) + "-" + str(args["exp_name"])
         )
 
-        # set the config of env
-        if self.algo_args["render"]["use_render"]:  # make envs for rendering
+        # 使用env tools中的函数创建训练/测试/render环境 （调取环境+插入config）
+        if self.algo_args["render"]["use_render"]:
+            # 创建单线程render环境
             (
                 self.envs,
                 self.manual_render,
@@ -70,13 +77,16 @@ class OnPolicyBaseRunner:
                 self.manual_delay,
                 self.env_num,
             ) = make_render_env(args["env"], algo_args["seed"]["seed"], env_args)
-        else:  # make envs for training and evaluation
+
+        else:
+            # 创建多线程训练环境
             self.envs = make_train_env(
                 args["env"],
                 algo_args["seed"]["seed"],
                 algo_args["train"]["n_rollout_threads"],
                 env_args,
             )
+            # 创建多线程测试环境
             self.eval_envs = (
                 make_eval_env(
                     args["env"],
@@ -87,6 +97,10 @@ class OnPolicyBaseRunner:
                 if algo_args["eval"]["use_eval"]
                 else None
             )
+
+        self.state_type = env_args.get("state_type", "EP")  # TODO： EP or FP need to be added to env args
+
+        # 智能体数量
         self.num_agents = get_num_agents(args["env"], env_args, self.envs)
 
         print("share_observation_space: ", self.envs.share_observation_space)
@@ -94,55 +108,75 @@ class OnPolicyBaseRunner:
         print("action_space: ", self.envs.action_space)
         print("num_agents: ", self.num_agents)
 
-        # actor
+        # actor相关
+        # actor共享参数
         if self.share_param:
             self.actor = []
+            # 初始化actor网络，进入mappo.py
             agent = ALGO_REGISTRY[args["algo"]](
-                {**algo_args["model"], **algo_args["algo"]},
+                {**algo_args["model"], **algo_args["algo"]},  # yaml里model和algo的config打包作为args进入OnPolicyBase
                 self.envs.observation_space[0],
                 self.envs.action_space[0],
                 device=self.device,
             )
+            # 因为共享参数，所以self.actor列表中只有一个actor，即所有agent共用一套actor网络
             self.actor.append(agent)
+
+            # 因为共享参数，agent之间的观测空间和动作空间都要同构
             for agent_id in range(1, self.num_agents):
+                # 所以self.envs.observation_space作为a list of obs space for each agent应该保持一致
                 assert (
                         self.envs.observation_space[agent_id]
                         == self.envs.observation_space[0]
                 ), "Agents have heterogeneous observation spaces, parameter sharing is not valid."
+                # 所以self.envs.action_space list of act space for each agent应该保持一致
                 assert (
                         self.envs.action_space[agent_id] == self.envs.action_space[0]
                 ), "Agents have heterogeneous action spaces, parameter sharing is not valid."
                 self.actor.append(self.actor[0])
+                # self.actor是一个list，里面有N个一模一样的actor，
+
+        # actor不共享参数 TODO：还没看
         else:
             self.actor = []
             for agent_id in range(self.num_agents):
+                # 给每一个agent初始化actor网络，进入mappo.py 【根据其不同的obs_dim和act_dim】
                 agent = ALGO_REGISTRY[args["algo"]](
                     {**algo_args["model"], **algo_args["algo"]},
                     self.envs.observation_space[agent_id],
                     self.envs.action_space[agent_id],
                     device=self.device,
                 )
+                # 因为共享参数，所以self.actor列表中有N个actor，所有agent每人一套actor网络
                 self.actor.append(agent)
 
+        # 训练
         if self.algo_args["render"]["use_render"] is False:  # train, not render
             self.actor_buffer = []
+            # 给每一个agent创立buffer，初始化buffer，进入OnPolicyActorBuffer
             for agent_id in range(self.num_agents):
                 ac_bu = OnPolicyActorBuffer(
-                    {**algo_args["train"], **algo_args["model"]},
-                    self.envs.observation_space[agent_id],
+                    {**algo_args["train"], **algo_args["model"]},  # yaml里model和algo的config打包作为args进入OnPolicyActorBuffer
+                    self.envs.observation_space[agent_id],  # 【根据其不同的obs_dim和act_dim】
                     self.envs.action_space[agent_id],
                 )
+                # self.actor_buffer列表中有N个buffer，所有agent每人一套buffer
                 self.actor_buffer.append(ac_bu)
 
+            # 单个agent的share obs space eg: Box(-inf, inf, (54,), float32)
             share_observation_space = self.envs.share_observation_space[0]
+
             self.critic = VCritic(
-                {**algo_args["model"], **algo_args["algo"]},
-                share_observation_space,
+                {**algo_args["model"], **algo_args["algo"]},  # yaml里model和algo的config打包作为args进入VCritic
+                share_observation_space,  # 中心式的值函数centralized critic的输入是agent的share_observation_space dim
                 device=self.device,
             )
+
+            # MAPPO trick: 原始论文section 5.2
             if self.state_type == "EP":
                 # EP stands for Environment Provided, as phrased by MAPPO paper.
                 # In EP, the global states for all agents are the same.
+                # EP的全局状态是所有agent的状态的拼接，所以所有agent的share_observation_space dim是一样的
                 self.critic_buffer = OnPolicyCriticBufferEP(
                     {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
                     share_observation_space,
@@ -150,67 +184,107 @@ class OnPolicyBaseRunner:
             elif self.state_type == "FP":
                 # FP stands for Feature Pruned, as phrased by MAPPO paper.
                 # In FP, the global states for all agents are different, and thus needs the dimension of the number of agents.
+
+                # FP的全局状态是EP+IND的prune版本（包含全局状态，agent specific状态，并且删除了冗余状态），因此每个agent不一样 #TODO：还没看
                 self.critic_buffer = OnPolicyCriticBufferFP(
                     {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
                     share_observation_space,
                     self.num_agents,
                 )
             else:
+                # TODO： 或许EP+IND的非prune版本？
                 raise NotImplementedError
 
+            # MAPPO trick: 原始论文 section 5.1 - PopArt？
             if self.algo_args["train"]["use_valuenorm"] is True:
                 self.value_normalizer = ValueNorm(1, device=self.device)
             else:
                 self.value_normalizer = None
 
+            # TODO：环境的logger，重写
             self.logger = LOGGER_REGISTRY[args["env"]](
                 args, algo_args, env_args, self.num_agents, self.writter, self.run_dir
             )
+
+        # 可以restore之前训练到一半的模型继续训练
         if self.algo_args["train"]["model_dir"] is not None:  # restore model
             self.restore()
 
     def run(self):
         """Run the training (or rendering) pipeline."""
+
+        # render,不是训练
         if self.algo_args["render"]["use_render"] is True:
             self.render()
             return
+
+        # 开始训练
         print("start running")
+
+        # 在环境reset之后返回的obs，share_obs，available_actions存入每一个actor的replay buffer 以及 集中式critic的replay buffer
         self.warmup()
 
+        # 计算总共需要跑多少个episode = 总训练时间步数 / 每个episode的时间步数 / 并行的环境数 (int)
         episodes = (
-                int(self.algo_args["train"]["num_env_steps"])
-                // self.algo_args["train"]["episode_length"]
-                // self.algo_args["train"]["n_rollout_threads"]
+                int(self.algo_args["train"]["num_env_steps"])  # 训练总时间步数
+                // self.algo_args["train"]["episode_length"]  # 每个episode的时间步数
+                // self.algo_args["train"]["n_rollout_threads"]  # 并行的环境数
         )
 
+        # 初始化logger
         self.logger.init(episodes)  # logger callback at the beginning of training
 
+        # 开始训练！！！！！！
+        # 对于每一个episode
         for episode in range(1, episodes + 1):
-            if self.algo_args["train"][
-                "use_linear_lr_decay"
-            ]:  # linear decay of learning rate
+            # 学习率是否随着episode线性递减
+            if self.algo_args["train"]["use_linear_lr_decay"]:
                 if self.share_param:
+                    # 在mappo继承的OnPolicyBase类中，episode是当前episode的index，episodes是总共需要跑多少个episode
                     self.actor[0].lr_decay(episode, episodes)
                 else:
                     for agent_id in range(self.num_agents):
                         self.actor[agent_id].lr_decay(episode, episodes)
+                # critic的lr_decay函数在VCritic类中，episode是当前episode的index，episodes是总共需要跑多少个episode
                 self.critic.lr_decay(episode, episodes)
 
+            # 每个episode开始的时候更新logger里面的episode index
             self.logger.episode_init(
                 episode
             )  # logger callback at the beginning of each episode
 
+            # 把actor和critic网络都切换到eval模式 #TODO：为什么
             self.prep_rollout()  # change to eval mode
+
+            # 对于这一个episode的每一个时间步
             for step in range(self.algo_args["train"]["episode_length"]):
-                # Sample actions from actors and values from critics
+                """
+                采样动作
+                values: (n_threads, 1)
+                actions: (n_threads, n_agents, action_dim)
+                action_log_probs: (n_threads, n_agents, 1)
+                rnn_states: (进程数量, n_agents, rnn层数, rnn层大小)
+                rnn_states_critic: (n_threads, rnn层数, rnn_hidden_dim)
+                """
                 (
                     values,
                     actions,
                     action_log_probs,
-                    rnn_states,
-                    rnn_states_critic,
+                    rnn_states,  # rnn_states是actor的rnn的hidden state
+                    rnn_states_critic,  # rnn_states_critic是critic的rnn的hidden state
                 ) = self.collect(step)
                 # actions: (n_threads, n_agents, action_dim)
+
+                """
+                在得到动作后，执行动作
+                与环境交互一个step，得到obs，share_obs，rewards，dones，infos，available_actions
+                # obs: (n_threads, n_agents, obs_dim)
+                # share_obs: (n_threads, n_agents, share_obs_dim)
+                # rewards: (n_threads, n_agents, 1)
+                # dones: (n_threads, n_agents)
+                # infos: (n_threads)
+                # available_actions: (n_threads, ) of None or (n_threads, n_agents, action_number)
+                """
                 (
                     obs,
                     share_obs,
@@ -219,12 +293,8 @@ class OnPolicyBaseRunner:
                     infos,
                     available_actions,
                 ) = self.envs.step(actions)
-                # obs: (n_threads, n_agents, obs_dim)
-                # share_obs: (n_threads, n_agents, share_obs_dim)
-                # rewards: (n_threads, n_agents, 1)
-                # dones: (n_threads, n_agents)
-                # infos: (n_threads)
-                # available_actions: (n_threads, ) of None or (n_threads, n_agents, action_number)
+
+                """每个step更新logger里面的per_step data"""
                 data = (
                     obs,
                     share_obs,
@@ -238,14 +308,17 @@ class OnPolicyBaseRunner:
                     rnn_states,
                     rnn_states_critic,
                 )
-
                 self.logger.per_step(data)  # logger callback at each step
 
+                """把这一步的数据存入每一个actor的replay buffer 以及 集中式critic的replay buffer"""
                 self.insert(data)  # insert data into buffer
 
             # compute return and update network
             self.compute()
-            self.prep_training()  # change to train mode
+
+            # 结束这一个episode的交互数据收集
+            # 把actor和critic网络都切换回train模式
+            self.prep_training()
 
             actor_train_infos, critic_train_info = self.train()
 
@@ -268,38 +341,80 @@ class OnPolicyBaseRunner:
             self.after_update()
 
     def warmup(self):
-        """Warm up the replay buffer."""
+        """
+        Warm up the replay buffer.
+        在环境reset之后返回的obs，share_obs，available_actions存入每一个actor的replay buffer 以及 集中式critic的replay buffer
+        """
         # reset env
         """
         obs: (n_threads, n_agents, obs_dim)
         share_obs: (n_threads, n_agents, share_obs_dim)
+        available_actions: (n_threads, n_agents, action_dim)
         """
+        # reset环境
         obs, share_obs, available_actions = self.envs.reset()
-        # replay buffer
+
+        # 准备阶段---每一个actor的replay buffer
         for agent_id in range(self.num_agents):
+            # self.actor_buffer[agent_id].obs是[episode_length+1, 进程数量, obs_shape]
+            # self.actor_buffer[agent_id].obs[0]是episode在t=0时的obs [进程数量, obs_shape]
+            # 在环境reset之后，把所有并行环境下的每一个agent在t=0时的obs放入buffer里的self.obs里
+            # 更多细节看OnPolicyActorBuffer
             self.actor_buffer[agent_id].obs[0] = obs[:, agent_id].copy()
+
             if self.actor_buffer[agent_id].available_actions is not None:
+                # 在环境reset之后，把所有并行环境下的每一个agent的available_actions放入buffer里的self.available_actions里
                 self.actor_buffer[agent_id].available_actions[0] = available_actions[
                                                                    :, agent_id
                                                                    ].copy()
+
+        # 准备阶段---集中式critic的replay buffer
+        # 更多细节看OnPolicyCriticBufferEP/FP
         if self.state_type == "EP":
+            # 在环境reset之后，把所有并行环境下的每一个agent在t=0时的share_obs放入buffer里的self.share_obs里
             self.critic_buffer.share_obs[0] = share_obs[:, 0].copy()
         elif self.state_type == "FP":
             self.critic_buffer.share_obs[0] = share_obs.copy()
 
-    @torch.no_grad()
+    @torch.no_grad()  # 前向，没有反向传播，不需要计算梯度
     def collect(self, step):
-        """Collect actions and values from actors and critics.
+        """
+        Collect actions and values from actors and critics.
+        从actor和critic中收集actions和values
         Args:
-            step: step in the episode.
+            step: step in the episode. 这一个episode的第几步
         Returns:
             values, actions, action_log_probs, rnn_states, rnn_states_critic
+            输出values, actions, action_log_probs, rnn_states（actor）, rnn_states_critic
         """
-        # collect actions, action_log_probs, rnn_states from n actors
+
+        # 从n个actor中收集actions, action_log_probs, rnn_states
+        # 初始化装他们的篮子
         action_collector = []
         action_log_prob_collector = []
         rnn_state_collector = []
+
+        # overwrite这两个初始化
+        values = []
+        rnn_states_critic = []
+
+        """
+        首先是actor的收集 - 伪代码12-13行
+        # 对于每一个agent对应的self.actor[agent_id]
+        # 给actor[agent_id]输入:  (有关输入可以参考OnPolicyActorBuffer的初始化)
+            - 当前时刻obs
+            - 上一时刻的rnn_state
+            - mask（？）
+            - 当前智能体的可用动作
+            - bool(有没有available_actions)
+        # 输出:
+            - action
+            - action_log_prob
+            - rnn_state(actor)
+        """
+
         for agent_id in range(self.num_agents):
+            # self.actor[agent_id].get_actions参考OnPolicyBase
             action, action_log_prob, rnn_state = self.actor[agent_id].get_actions(
                 self.actor_buffer[agent_id].obs[step],
                 self.actor_buffer[agent_id].rnn_states[step],
@@ -308,14 +423,27 @@ class OnPolicyBaseRunner:
                 if self.actor_buffer[agent_id].available_actions is not None
                 else None,
             )
+            # tensor转numpy
             action_collector.append(_t2n(action))
             action_log_prob_collector.append(_t2n(action_log_prob))
             rnn_state_collector.append(_t2n(rnn_state))
-        # (n_agents, n_threads, dim) -> (n_threads, n_agents, dim)
+
+        # 转置 (n_agents, n_threads, dim) -> (n_threads, n_agents, dim)
         actions = np.array(action_collector).transpose(1, 0, 2)
         action_log_probs = np.array(action_log_prob_collector).transpose(1, 0, 2)
         rnn_states = np.array(rnn_state_collector).transpose(1, 0, 2, 3)
 
+        """
+        然后是critic的收集 - 伪代码14行
+        两种情况：每个agent的全局状态是否一样 
+        # 给critic输入:
+            - 当前时刻的share_obs
+            - 上一时刻的rnn_state_critic
+            - mask
+        # 输出:
+            - value
+            - rnn_state_critic
+        """
         # collect values, rnn_states_critic from 1 critic
         if self.state_type == "EP":
             value, rnn_state_critic = self.critic.get_values(
@@ -324,8 +452,11 @@ class OnPolicyBaseRunner:
                 self.critic_buffer.masks[step],
             )
             # (n_threads, dim)
+
+            # tensor转numpy
             values = _t2n(value)
             rnn_states_critic = _t2n(rnn_state_critic)
+
         elif self.state_type == "FP":
             value, rnn_state_critic = self.critic.get_values(
                 np.concatenate(self.critic_buffer.share_obs[step]),
@@ -356,62 +487,70 @@ class OnPolicyBaseRunner:
             values,  # EP: (n_threads, dim), FP: (n_threads, n_agents, dim)
             actions,  # (n_threads, n_agents, action_dim)
             action_log_probs,  # (n_threads, n_agents, action_dim)
-            rnn_states,  # (n_threads, n_agents, dim)
-            rnn_states_critic,  # EP: (n_threads, dim), FP: (n_threads, n_agents, dim)
+            rnn_states,  # (n_threads, n_agents, rnn层数, dim)
+            rnn_states_critic,  # EP: (n_threads, rnn层数, dim), FP: (n_threads, n_agents, dim)
         ) = data
 
-        dones_env = np.all(dones, axis=1)  # if all agents are done, then env is done
-        rnn_states[
-            dones_env == True
-            ] = np.zeros(  # if env is done, then reset rnn_state to all zero
-            (
-                (dones_env == True).sum(),
-                self.num_agents,
-                self.recurrent_n,
-                self.rnn_hidden_size,
-            ),
-            dtype=np.float32,
-        )
+        # 当所有智能体都done了 那么env就done了(n_threads, ) TODO check
+        dones_env = np.all(dones, axis=1)
+
+        """
+        重置actor和critic的rnn_state
+        """
+        # if env is done, then reset rnn_state to all zero
+        # 如果哪个env done了，那么就把那个环境的rnn_state (所有actor)置为0
+        rnn_states[dones_env == True] = np.zeros(((dones_env == True).sum(), #dones_env里有几个true，几个并行环境done了
+                                                  self.num_agents,
+                                                  self.recurrent_n,
+                                                  self.rnn_hidden_size,), dtype=np.float32, )
 
         # If env is done, then reset rnn_state_critic to all zero
+        # 如果哪个env done了，那么就把那个环境的rnn_state (critic)置为0
         if self.state_type == "EP":
-            rnn_states_critic[dones_env == True] = np.zeros(
-                ((dones_env == True).sum(), self.recurrent_n, self.rnn_hidden_size),
-                dtype=np.float32,
-            )
+            rnn_states_critic[dones_env == True] = np.zeros(((dones_env == True).sum(), #dones_env里有几个true，几个并行环境done了
+                                                             self.recurrent_n,
+                                                             self.rnn_hidden_size),dtype=np.float32,)
         elif self.state_type == "FP":
-            rnn_states_critic[dones_env == True] = np.zeros(
-                (
-                    (dones_env == True).sum(),
-                    self.num_agents,
-                    self.recurrent_n,
-                    self.rnn_hidden_size,
-                ),
-                dtype=np.float32,
-            )
+            rnn_states_critic[dones_env == True] = np.zeros(((dones_env == True).sum(),
+                                                             self.num_agents,
+                                                             self.recurrent_n,
+                                                             self.rnn_hidden_size,), dtype=np.float32, )
 
+        """
+        重置masks
+        把已经done了的env的mask由1置为0
+        这个mask是表示着什么时候哪一个并行环境的rnn_state要重置
         # masks use 0 to mask out threads that just finish.
         # this is used for denoting at which point should rnn state be reset
-        masks = np.ones(
-            (self.algo_args["train"]["n_rollout_threads"], self.num_agents, 1),
-            dtype=np.float32,
-        )
-        masks[dones_env == True] = np.zeros(
-            ((dones_env == True).sum(), self.num_agents, 1), dtype=np.float32
-        )
-
+        """
+        # 初始化所有环境的mask是1
+        masks = np.ones((self.algo_args["train"]["n_rollout_threads"],
+                         self.num_agents,
+                         1), dtype=np.float32,)
+        # 如果哪个env done了，那么就把那个环境的mask置为0
+        masks[dones_env == True] = np.zeros(((dones_env == True).sum(),  # 几个并行环境done了
+                                             self.num_agents,
+                                             1), dtype=np.float32)
+        """
+        重置active_masks
+        把已经死掉的agent的mask由1置为0
         # active_masks use 0 to mask out agents that have died
-        active_masks = np.ones(
-            (self.algo_args["train"]["n_rollout_threads"], self.num_agents, 1),
-            dtype=np.float32,
-        )
-        active_masks[dones == True] = np.zeros(
-            ((dones == True).sum(), 1), dtype=np.float32
-        )
-        active_masks[dones_env == True] = np.ones(
-            ((dones_env == True).sum(), self.num_agents, 1), dtype=np.float32
-        )
+        """
+        # 初始化所有环境的mask是1
+        active_masks = np.ones((self.algo_args["train"]["n_rollout_threads"],
+                                self.num_agents,
+                                1), dtype=np.float32,)
+        # 如果哪个agent done了，那么就把那个agent的mask置为0
+        active_masks[dones == True] = np.zeros(((dones == True).sum(),
+                                                1), dtype=np.float32)
+        # 如果哪个env done了，那么就把那个环境的mask置为1
+        active_masks[dones_env == True] = np.ones(((dones_env == True).sum(),
+                                                   self.num_agents,
+                                                   1), dtype=np.float32)
 
+        """
+        重置bad_masks
+        """
         # bad_masks use 0 to denote truncation and 1 to denote termination
         if self.state_type == "EP":
             bad_masks = np.array(
@@ -437,6 +576,7 @@ class OnPolicyBaseRunner:
                 ]
             )
 
+        # 插入actor_buffer
         for agent_id in range(self.num_agents):
             self.actor_buffer[agent_id].insert(
                 obs[:, agent_id],
@@ -450,6 +590,7 @@ class OnPolicyBaseRunner:
                 else None,
             )
 
+        # 插入critic_buffer
         if self.state_type == "EP":
             self.critic_buffer.insert(
                 share_obs[:, 0],
@@ -467,9 +608,12 @@ class OnPolicyBaseRunner:
     @torch.no_grad()
     def compute(self):
         """Compute returns and advantages.
-        Compute critic evaluation of the last state,
+        训练开始之前，首先调用self.compute()函数计算这个episode的折扣回报
+        在计算折扣回报之前，先算这个episode最后一个状态的状态值函数next_values，其shape=(环境数, 1)然后调用compute_returns函数计算折扣回报
+        Compute critic evaluation of the last state, V（s-T）
         and then let buffer compute returns, which will be used during training.
         """
+        # 计算critic的最后一个state的值  #TODO self.collect里面没计算吗
         if self.state_type == "EP":
             next_value, _ = self.critic.get_values(
                 self.critic_buffer.share_obs[-1],
@@ -486,6 +630,9 @@ class OnPolicyBaseRunner:
             next_value = np.array(
                 np.split(_t2n(next_value), self.algo_args["train"]["n_rollout_threads"])
             )
+
+        # next_value --- np.array shape=(环境数, 1) -- 最后一个状态的状态值
+        # self.value_normalizer --- ValueNorm
         self.critic_buffer.compute_returns(next_value, self.value_normalizer)
 
     def train(self):
@@ -716,14 +863,22 @@ class OnPolicyBaseRunner:
 
     def prep_rollout(self):
         """Prepare for rollout."""
+
+        # 每一个actor
         for agent_id in range(self.num_agents):
+            # 测试actor网络结构 actor_policy.eval()
             self.actor[agent_id].prep_rollout()
+
+        # 集中式critic
+        # 测试critic网络结构 critic_policy.eval()
         self.critic.prep_rollout()
 
     def prep_training(self):
         """Prepare for training."""
         for agent_id in range(self.num_agents):
+            # 开始准备训练 actor_policy.train()
             self.actor[agent_id].prep_training()
+        #开始准备训练 critic_policy.train()
         self.critic.prep_training()
 
     def save(self):
