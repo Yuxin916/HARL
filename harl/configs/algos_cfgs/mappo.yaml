@@ -53,6 +53,7 @@ model:
   # initialization method for network parameters, choose from xavier_uniform_, orthogonal_, ...
   initialization_method: orthogonal_
   # gain of the output layer of the network.
+  # # 激活函数的斜率或增益，增益较大的激活函数会更敏感地响应输入的小变化，而增益较小的激活函数则会对输入的小变化不那么敏感
   gain: 0.01
   # recurrent parameters
   # whether to use rnn policy (data is not chunked for training)
@@ -112,11 +113,11 @@ algo:
   # huber delta
   huber_delta: 10.0
   # method of aggregating the probability of multi-dimensional actions, choose from prod, mean
-  action_aggregation: prod
+  action_aggregation: prod  # TODO：这是什么
   # whether to share parameter among actors
   share_param: True
   # whether to use a fixed optimisation order
-  fixed_order: True
+  fixed_order: True  # TODO：这是什么
 logger:
   # logging directory
   log_dir: "./results"

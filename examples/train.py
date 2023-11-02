@@ -10,7 +10,7 @@ python train.py --load_config <CONFIG FILE PATH>
 for example: 
 python train.py --algo mappo --env lag --exp_name lag_mappo
 python train.py --algo mappo --env pettingzoo_mpe --exp_name mpe_mappo
-python train.py --load_config /home/tsaisplus/MuRPE_base/Heterogenous-MARL/tuned_configs/pettingzoo_mpe/simple_spread_v2-continuous/mappo/config.json
+python train.py --load_config /home/tsaisplus/MuRPE_base/Heterogenous-MARL/tuned_configs/pettingzoo_mpe/simple_spread_v2-continuous/maddpg/config.json
 
 eg:
 share_observation_space:  [Box(-inf, inf, (54,), float32), Box(-inf, inf, (54,), float32), Box(-inf, inf, (54,), float32)]

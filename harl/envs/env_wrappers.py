@@ -224,6 +224,7 @@ class ShareSubprocVecEnv(ShareVecEnv):
         """
         self.waiting = False
         self.closed = False
+        # 环境个数
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
         self.ps = [

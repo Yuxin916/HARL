@@ -53,6 +53,7 @@ def make_train_env(env_name, seed, n_threads, env_args):
 
         return DexHandsEnv({"n_threads": n_threads, **env_args})
 
+    # 调取原始环境
     def get_env_fn(rank):
         def init_env():
             if env_name == "smac":
@@ -96,7 +97,7 @@ def make_train_env(env_name, seed, n_threads, env_args):
             elif env_name == "ast":
                 from harl.envs.ast.ast_env import ASTEnv
 
-                env = ASTEnv(env_args)
+                env = ASTEnv(env_args)  # TODO: add seed to ASTEnv 保证环境不同
             else:
                 print("Can not support the " + env_name + "environment.")
                 raise NotImplementedError
@@ -104,6 +105,8 @@ def make_train_env(env_name, seed, n_threads, env_args):
             return env
 
         return init_env
+
+    # 生成多线程环境
     if n_threads == 1:
         return ShareDummyVecEnv([get_env_fn(0)])
     else:
