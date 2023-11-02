@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-class ValueNorm(nn.Module):
+class ValueNorm(nn.Module):  # TODO
     """Normalize a vector of observations - across the first norm_axes dimensions"""
 
     def __init__(
@@ -34,9 +34,11 @@ class ValueNorm(nn.Module):
         self.debiasing_term = nn.Parameter(torch.tensor(0.0), requires_grad=False).to(
             **self.tpdv
         )
+        pass
 
     def running_mean_var(self):
-        """Get running mean and variance."""
+        """Get running mean and variance.
+        计算数据的滚动均值和滚动方差"""
         debiased_mean = self.running_mean / self.debiasing_term.clamp(min=self.epsilon)
         debiased_mean_sq = self.running_mean_sq / self.debiasing_term.clamp(
             min=self.epsilon
@@ -64,24 +66,30 @@ class ValueNorm(nn.Module):
         self.debiasing_term.mul_(weight).add_(1.0 * (1.0 - weight))
 
     def normalize(self, input_vector):
+        """将输入的向量进行归一化处理"""
         if isinstance(input_vector, np.ndarray):
             input_vector = torch.from_numpy(input_vector)
         input_vector = input_vector.to(**self.tpdv)
 
+        # 计算出运行时的均值和方差
         mean, var = self.running_mean_var()
+        # 将输入向量减去均值，然后除以方差的平方根
         out = (input_vector - mean[(None,) * self.norm_axes]) / torch.sqrt(var)[
             (None,) * self.norm_axes
         ]
-
+        # 将使输入向量的数据分布归一化为均值为0，方差为1的标准正态分布
         return out
 
     def denormalize(self, input_vector):
-        """Transform normalized data back into original distribution"""
+        """Transform normalized data back into original distribution
+        用于将归一化后的数据还原为原始数据分布"""
         if isinstance(input_vector, np.ndarray):
             input_vector = torch.from_numpy(input_vector)
         input_vector = input_vector.to(**self.tpdv)
 
+        # 计算出运行时的均值和方差
         mean, var = self.running_mean_var()
+        # 将输入向量乘以方差的平方根，然后加上均值
         out = (
             input_vector * torch.sqrt(var)[(None,) * self.norm_axes]
             + mean[(None,) * self.norm_axes]
@@ -89,4 +97,5 @@ class ValueNorm(nn.Module):
 
         out = out.cpu().numpy()
 
+        # 将归一化后的数据还原为原始数据分布
         return out

@@ -28,7 +28,10 @@ class BaseLogger:
         raise NotImplementedError
 
     def init(self, episodes):
-        """Initialize the logger."""
+        """
+        Initialize the logger.
+        输入：episodes总个数
+        """
         self.start = time.time()
         self.episodes = episodes
         self.train_episode_rewards = np.zeros(

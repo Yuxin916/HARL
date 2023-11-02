@@ -14,21 +14,36 @@ class OnPolicyCriticBufferEP:
             args: (dict) arguments
             share_obs_space: (gym.Space or list) share observation space
         """
-        self.episode_length = args["episode_length"]
-        self.n_rollout_threads = args["n_rollout_threads"]
-        self.hidden_sizes = args["hidden_sizes"]
-        self.rnn_hidden_size = self.hidden_sizes[-1]
-        self.recurrent_n = args["recurrent_n"]
-        self.gamma = args["gamma"]
-        self.gae_lambda = args["gae_lambda"]
-        self.use_gae = args["use_gae"]
-        self.use_proper_time_limits = args["use_proper_time_limits"]
+        self.episode_length = args["episode_length"]  # 每个环境的episode长度 TODO：检查env config
+        self.n_rollout_threads = args["n_rollout_threads"] # 多进程环境数量
+        self.hidden_sizes = args["hidden_sizes"] # critic网络的隐藏层大小
+        self.rnn_hidden_size = self.hidden_sizes[-1] # rnn隐藏层大小
+        self.recurrent_n = args["recurrent_n"] # rnn的层数
 
-        share_obs_shape = get_shape_from_obs_space(share_obs_space)
+        self.gamma = args["gamma"]  # 折扣因子
+        self.gae_lambda = args["gae_lambda"]  # GAE的参数
+        self.use_gae = args["use_gae"]  # 是否使用GAE
+
+        self.use_proper_time_limits = args["use_proper_time_limits"]  # 是否考虑episode的提前结束
+
+        share_obs_shape = get_shape_from_obs_space(share_obs_space)  # 获取单个智能体状态空间的形状，tuple of integer. eg: （54，）
+
         if isinstance(share_obs_shape[-1], list):
             share_obs_shape = share_obs_shape[:1]
 
+        """
+        Critic Buffer里储存了： ALL (np.ndarray) NOTE： 所有agent的全局状态是一样的
+        1. self.share_obs: 全局状态 [episode_length + 1, 进程数量, share_obs_shape]
+        2. self.rnn_states_critic: critic的rnn状态 [episode_length + 1, 进程数量, recurrent_n, rnn_hidden_size]
+        3. self.value_preds: critic的value预测 [episode_length + 1, 进程数量, 1]
+        4. self.returns: 每一步的计算的return [episode_length + 1, 进程数量, 1]
+        5. self.rewards: 每一步的reward [episode_length, 进程数量, 1]
+        6. self.masks: 每一步的mask,环境是否done [episode_length + 1, 进程数量, 1]
+        7. self.bad_masks: 每一步的bad_mask,是否提前结束truncation [episode_length + 1, 进程数量, 1] 和6一起看
+        """
+
         # Buffer for share observations
+
         self.share_obs = np.zeros(
             (self.episode_length + 1, self.n_rollout_threads, *share_obs_shape),
             dtype=np.float32,
@@ -65,7 +80,8 @@ class OnPolicyCriticBufferEP:
             (self.episode_length + 1, self.n_rollout_threads, 1), dtype=np.float32
         )
 
-        # Buffer for bad masks indicating truncation and termination. If 0, trunction; if 1 and masks is 0, termination; else, not done yet.
+        # Buffer for bad masks indicating truncation and termination.
+        # If 0, trunction; if 1 and masks is 0, termination; else, not done yet.
         self.bad_masks = np.ones_like(self.masks)
 
         self.step = 0
@@ -99,15 +115,23 @@ class OnPolicyCriticBufferEP:
         Args:
             next_value: (np.ndarray) value predictions for the step after the last episode step.
             value_normalizer: (ValueNorm) If not None, ValueNorm value normalizer instance.
+        # next_value --- np.array shape=(环境数, 1) -- 最后一个状态的状态值
+        # self.value_normalizer --- ValueNorm
         """
-        if (
-            self.use_proper_time_limits
-        ):  # consider the difference between truncation and termination
+        # consider the difference between truncation and termination
+        if self.use_proper_time_limits:
             if self.use_gae:  # use GAE
+                # 把最后一个状态的状态值放到value_preds的最后一个位置, index是200
                 self.value_preds[-1] = next_value
-                gae = 0
-                for step in reversed(range(self.rewards.shape[0])):
-                    if value_normalizer is not None:  # use ValueNorm
+                gae = 0  # 可以看成gae(200) = 0
+                # timestep从后往前--倒推的方式
+                for step in reversed(range(self.rewards.shape[0])):  # 从step199到0
+                    # use ValueNorm
+                    # 在GAE计算中，将值函数的估计值denormalize，然后再计算GAE，最后再normalize
+                    if value_normalizer is not None:
+                        # 计算delta[step]
+                        # delta[step] = r([step]) + gamma * V(s[step+1]) * mask - V(s[step]) -- 如果下一个step done
+                        # delta[step] = r([step]) + gamma * 0 * mask - V(s[step]) -- 如果下一个step done
                         delta = (
                             self.rewards[step]
                             + self.gamma
@@ -115,14 +139,20 @@ class OnPolicyCriticBufferEP:
                             * self.masks[step + 1]
                             - value_normalizer.denormalize(self.value_preds[step])
                         )
+
+                        # gae递归公式，查看https://zhuanlan.zhihu.com/p/651944382和笔记
+                        # gae[step] = delta[step] + gamma * lambda * mask[t+1] * gae[t+1]
                         gae = (
                             delta
                             + self.gamma * self.gae_lambda * self.masks[step + 1] * gae
                         )
+
+                        # 因为分离了terminated和truncated
                         gae = self.bad_masks[step + 1] * gae
-                        self.returns[step] = gae + value_normalizer.denormalize(
-                            self.value_preds[step]
-                        )
+
+                        # V网络的标签值 = GAE(step) + V网络(step) -- 标量
+                        self.returns[step] = gae + value_normalizer.denormalize(self.value_preds[step])
+
                     else:  # do not use ValueNorm
                         delta = (
                             self.rewards[step]
@@ -135,35 +165,46 @@ class OnPolicyCriticBufferEP:
                             delta
                             + self.gamma * self.gae_lambda * self.masks[step + 1] * gae
                         )
+
+                        # 因为分离了terminated和truncated
                         gae = self.bad_masks[step + 1] * gae
+
+                        # V网络的标签值 = GAE + V网络的估计值 -- 标量
                         self.returns[step] = gae + self.value_preds[step]
+
             else:  # do not use GAE
+                # 把最后一个状态的状态值放到value_preds的最后一个位置, index是200
                 self.returns[-1] = next_value
+
                 for step in reversed(range(self.rewards.shape[0])):
                     if value_normalizer is not None:  # use ValueNorm
-                        self.returns[step] = (
-                            self.returns[step + 1] * self.gamma * self.masks[step + 1]
-                            + self.rewards[step]
-                        ) * self.bad_masks[step + 1] + (
-                            1 - self.bad_masks[step + 1]
-                        ) * value_normalizer.denormalize(
-                            self.value_preds[step]
-                        )
+                        # Q递归公式 - V网络的标签值
+                        # Q[step] = r([step]) + gamma * V(s[step+1]) * mask
+                        discounted_cum_reward = (self.returns[step + 1] * self.gamma * self.masks[step + 1]
+                            + self.rewards[step])
+                        #   TODO 没看完
+                        discounted_value = (1 - self.bad_masks[step + 1]) * value_normalizer.denormalize(
+                            self.value_preds[step])
+                        self.returns[step] = discounted_cum_reward * self.bad_masks[step + 1] + discounted_value
+
                     else:  # do not use ValueNorm
-                        self.returns[step] = (
-                            self.returns[step + 1] * self.gamma * self.masks[step + 1]
-                            + self.rewards[step]
-                        ) * self.bad_masks[step + 1] + (
-                            1 - self.bad_masks[step + 1]
-                        ) * self.value_preds[
-                            step
-                        ]
-        else:  # do not consider the difference between truncation and termination, i.e. all done episodes are terminated
+                        self.returns[step] = (self.returns[step + 1] *
+                                              self.gamma *
+                                              self.masks[step + 1] +
+                                              self.rewards[step]) \
+                                             * \
+                                              self.bad_masks[step + 1] + \
+                                             (1 - self.bad_masks[step + 1]) * \
+                                             self.value_preds[step]
+        # do not consider the difference between truncation and termination, i.e. all done episodes are terminated
+        else:
             if self.use_gae:  # use GAE
+                # 把最后一个状态的状态值放到value_preds的最后一个位置, index是200
                 self.value_preds[-1] = next_value
-                gae = 0
+                gae = 0  # 可以看成gae(200) = 0
                 for step in reversed(range(self.rewards.shape[0])):
                     if value_normalizer is not None:  # use ValueNorm
+                        # 计算delta(step) = r(step) + gamma * V(step+1) * mask(step+1) - V(step)
                         delta = (
                             self.rewards[step]
                             + self.gamma
@@ -171,13 +212,14 @@ class OnPolicyCriticBufferEP:
                             * self.masks[step + 1]
                             - value_normalizer.denormalize(self.value_preds[step])
                         )
+                        # 计算GAE(step) = delta(step) + gamma * lambda * mask(step+1) * gae(step+1)
                         gae = (
                             delta
                             + self.gamma * self.gae_lambda * self.masks[step + 1] * gae
                         )
-                        self.returns[step] = gae + value_normalizer.denormalize(
-                            self.value_preds[step]
-                        )
+
+                        # V网络的标签值 = GAE(step) + V网络(step) -- 标量
+                        self.returns[step] = gae + value_normalizer.denormalize(self.value_preds[step])
                     else:  # do not use ValueNorm
                         delta = (
                             self.rewards[step]
@@ -190,14 +232,18 @@ class OnPolicyCriticBufferEP:
                             delta
                             + self.gamma * self.gae_lambda * self.masks[step + 1] * gae
                         )
+
+                        # V网络的标签值 = GAE + V网络的估计值 -- 标量
                         self.returns[step] = gae + self.value_preds[step]
+
             else:  # do not use GAE
+                # 把最后一个状态的状态值放到value_preds的最后一个位置, index是200
                 self.returns[-1] = next_value
+
                 for step in reversed(range(self.rewards.shape[0])):
-                    self.returns[step] = (
-                        self.returns[step + 1] * self.gamma * self.masks[step + 1]
-                        + self.rewards[step]
-                    )
+                    # V网络的标签值 = r + gamma * V(s[t+1]) * mask
+                    self.returns[step] = (self.returns[step + 1] * self.gamma * self.masks[step + 1]
+                                          + self.rewards[step])
 
     def feed_forward_generator_critic(
         self, critic_num_mini_batch=None, mini_batch_size=None

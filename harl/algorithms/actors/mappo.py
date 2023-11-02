@@ -11,19 +11,19 @@ class MAPPO(OnPolicyBase):
     def __init__(self, args, obs_space, act_space, device=torch.device("cpu")):
         """Initialize MAPPO algorithm.
         Args:
-            args: (dict) arguments.
-            obs_space: (gym.spaces or list) observation space.
-            act_space: (gym.spaces) action space.
+            args: (dict) arguments. # yaml里model和algo的config打包作为args进入OnPolicyBase
+            obs_space: (gym.spaces or list) observation space. # 单个智能体的观测空间 eg: Box (18,)
+            act_space: (gym.spaces) action space. # 单个智能体的动作空间 eg: Discrete(5,)
             device: (torch.device) device to use for tensor operations.
         """
         super(MAPPO, self).__init__(args, obs_space, act_space, device)
 
-        self.clip_param = args["clip_param"]
-        self.ppo_epoch = args["ppo_epoch"]
-        self.actor_num_mini_batch = args["actor_num_mini_batch"]
-        self.entropy_coef = args["entropy_coef"]
-        self.use_max_grad_norm = args["use_max_grad_norm"]
-        self.max_grad_norm = args["max_grad_norm"]
+        self.clip_param = args["clip_param"]  # PPO的clip参数
+        self.ppo_epoch = args["ppo_epoch"]  # TODO PPO相关
+        self.actor_num_mini_batch = args["actor_num_mini_batch"] # TODO PPO相关
+        self.entropy_coef = args["entropy_coef"]  # TODO PPO相关
+        self.use_max_grad_norm = args["use_max_grad_norm"] # TODO PPO相关
+        self.max_grad_norm = args["max_grad_norm"]  # TODO PPO相关
 
     def update(self, sample):
         """Update actor network.
@@ -148,6 +148,7 @@ class MAPPO(OnPolicyBase):
 
     def share_param_train(self, actor_buffer, advantages, num_agents, state_type):
         """Perform a training update for parameter-sharing MAPPO using minibatch GD.
+        共享参数版本的MAPPO的训练&更新 -- minibatch GD
         Args:
             actor_buffer: (list[OnPolicyActorBuffer]) buffer containing training data related to actor.
             advantages: (np.ndarray) advantages.
@@ -171,13 +172,14 @@ class MAPPO(OnPolicyBase):
                 advantages_copy = advantages.copy()
                 advantages_copy[actor_buffer[agent_id].active_masks[:-1] == 0.0] = np.nan
                 advantages_copy_list.append(advantages_copy)
+
             advantages_ori_tensor = np.array(advantages_ori_list)
             advantages_copy_tensor = np.array(advantages_copy_list)
+
             mean_advantages = np.nanmean(advantages_copy_tensor)
             std_advantages = np.nanstd(advantages_copy_tensor)
-            normalized_advantages = (advantages_ori_tensor - mean_advantages) / (
-                std_advantages + 1e-5
-            )
+            normalized_advantages = (advantages_ori_tensor - mean_advantages) / (std_advantages + 1e-5)
+
             advantages_list = []
             for agent_id in range(num_agents):
                 advantages_list.append(normalized_advantages[agent_id])

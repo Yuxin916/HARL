@@ -12,21 +12,31 @@ class OnPolicyActorBuffer:
     def __init__(self, args, obs_space, act_space):
         """Initialize on-policy actor buffer.
         Args:
-            args: (dict) arguments
-            obs_space: (gym.Space or list) observation space
-            act_space: (gym.Space) action space
+            args: (dict) arguments # yaml里model和algo的config打包作为args进入OnPolicyActorBuffer
+            obs_space: (gym.Space or list) observation space # 单个智能体的观测空间 eg: Box (18,)
+            act_space: (gym.Space) action space # 单个智能体的动作空间 eg: Discrete(5,)
         """
-        self.episode_length = args["episode_length"]
-        self.n_rollout_threads = args["n_rollout_threads"]
-        self.hidden_sizes = args["hidden_sizes"]
-        self.rnn_hidden_size = self.hidden_sizes[-1]
-        self.recurrent_n = args["recurrent_n"]
+        self.episode_length = args["episode_length"]  # 每个环境的episode长度 TODO：检查env config
+        self.n_rollout_threads = args["n_rollout_threads"]  # 多进程环境数量
+        self.hidden_sizes = args["hidden_sizes"]  # actor网络的隐藏层大小
+        self.rnn_hidden_size = self.hidden_sizes[-1]  # rnn隐藏层大小
+        self.recurrent_n = args["recurrent_n"]  # rnn的层数
 
-        obs_shape = get_shape_from_obs_space(obs_space)
+        obs_shape = get_shape_from_obs_space(obs_space)  # 获取单个智能体观测空间的形状，tuple of integer. eg: （18，）
 
         if isinstance(obs_shape[-1], list):
             obs_shape = obs_shape[:1]
 
+        """
+        Actor Buffer里储存了： ALL (np.ndarray)
+        1. self.obs: local agent inputs to the actor. # 当前智能体的输入 [episode_length+1, 进程数量, obs_shape]
+        2. self.rnn_states: rnn states of the actor. # 当前智能体的rnn状态 [episode_length+1, 进程数量, rnn层数, rnn层大小]
+        3. self.available_actions: available actions of the actor. # 当前智能体的可用动作（仅离散） [episode_length+1, 进程数量, 动作空间大小]
+        4. self.actions: actions of the actor. # 当前智能体的动作 [episode_length, 进程数量, 1（单个离散）]
+        5. self.action_log_probs: action log probs of the actor. # 当前智能体选取的动作的log概率 [episode_length, 进程数量, 1（单个离散）]
+        6. self.masks: 这个agent每一步的mask,是否done (rnn需要reset)  [episode_length+1, 进程数量, 1]
+        7. self.active_masks:这个agent每一步的是否存活[episode_length+1, 进程数量, 1]
+        """
         # Buffer for observations of this actor.
         self.obs = np.zeros(
             (self.episode_length + 1, self.n_rollout_threads, *obs_shape),
@@ -53,6 +63,7 @@ class OnPolicyActorBuffer:
         else:
             self.available_actions = None
 
+        # 获取动作空间的维度，integer. eg: 1-》单个离散，
         act_shape = get_shape_from_act_space(act_space)
 
         # Buffer for actions of this actor.
@@ -69,9 +80,10 @@ class OnPolicyActorBuffer:
         self.masks = np.ones((self.episode_length + 1, self.n_rollout_threads, 1), dtype=np.float32)
 
         # Buffer for active masks of this actor. Active masks denotes whether the agent is alive.
+        # 当前这个agent在不同并行环境的不同时间点是否存活，如果不存活，那么就不需要计算loss，不需要更新参数
         self.active_masks = np.ones_like(self.masks)
 
-        self.factor = None
+        self.factor = None  #TODO：这是什么
 
         self.step = 0
 

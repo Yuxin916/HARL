@@ -10,7 +10,7 @@ class OnPolicyCriticBufferFP:
     When FP state is used, the critic takes different global state as input for different actors. Thus, OnPolicyCriticBufferFP has an extra dimension for number of agents compared to OnPolicyCriticBufferEP.
     """
 
-    def __init__(self, args, share_obs_space, num_agents):
+    def __init__(self, args, share_obs_space, num_agents):  # TODO： 没看
         """Initialize on-policy critic buffer.
         Args:
             args: (dict) arguments

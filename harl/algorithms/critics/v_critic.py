@@ -17,11 +17,12 @@ class VCritic:
     """
 
     def __init__(self, args, cent_obs_space, device=torch.device("cpu")):
-        self.args = args
+        self.args = args  # yaml里model和algo的config打包作为args进入VCritic
         self.device = device
-        self.tpdv = dict(dtype=torch.float32, device=device)
+        self.tpdv = dict(dtype=torch.float32, device=device)  # dtype和device
 
-        self.clip_param = args["clip_param"]
+        self.clip_param = args["clip_param"]  # PPO的clip参数
+        #TODO: PPO相关 在下面的update函数中用到 对应
         self.critic_epoch = args["critic_epoch"]
         self.critic_num_mini_batch = args["critic_num_mini_batch"]
         self.data_chunk_length = args["data_chunk_length"]
@@ -36,23 +37,27 @@ class VCritic:
         self.use_huber_loss = args["use_huber_loss"]
         self.use_policy_active_masks = args["use_policy_active_masks"]
 
-        self.critic_lr = args["critic_lr"]
-        self.opti_eps = args["opti_eps"]
-        self.weight_decay = args["weight_decay"]
+        self.critic_lr = args["critic_lr"]  # critic的学习率
+        self.opti_eps = args["opti_eps"]  # critic Adam优化器的eps
+        self.weight_decay = args["weight_decay"]  # critic Adam优化器的weight_decay
 
-        self.share_obs_space = cent_obs_space
+        self.share_obs_space = cent_obs_space  # 共享观测空间/全局状态空间 eg. Box(-inf, inf, (54,), float32)
 
+        # 初始化critic网络，输入为共享观测空间，输出为1维分数R
         self.critic = VNet(args, self.share_obs_space, self.device)
 
+        # 初始化critic网络的优化器
         self.critic_optimizer = torch.optim.Adam(
             self.critic.parameters(),
             lr=self.critic_lr,
             eps=self.opti_eps,
             weight_decay=self.weight_decay,
         )
+        pass
 
     def lr_decay(self, episode, episodes):
         """Decay the actor and critic learning rates.
+        episode是当前episode的index，episodes是总共需要跑多少个episode
         Args:
             episode: (int) current training episode.
             episodes: (int) total number of training episodes.
@@ -66,7 +71,7 @@ class VCritic:
             rnn_states_critic: (np.ndarray) if critic is RNN, RNN states for critic.
             masks: (np.ndarray) denotes points at which RNN states should be reset.
         Returns:
-            values: (torch.Tensor) value function predictions.
+            values: (torch.Tensor) value function predictions. (并行环境数量, 1)
             rnn_states_critic: (torch.Tensor) updated critic network RNN states.
         """
         values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
