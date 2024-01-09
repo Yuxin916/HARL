@@ -20,7 +20,7 @@ class VNet(nn.Module):
         super(VNet, self).__init__()
         self.hidden_sizes = args["hidden_sizes"] # MLP隐藏层神经元数量
         self.initialization_method = args["initialization_method"]  # 网络权重初始化方法
-        self.use_naive_recurrent_policy = args["use_naive_recurrent_policy"]  #TODO
+        self.use_naive_recurrent_policy = args["use_naive_recurrent_policy"]
         self.use_recurrent_policy = args["use_recurrent_policy"]
         self.recurrent_n = args["recurrent_n"]  # RNN的层数
         self.tpdv = dict(dtype=torch.float32, device=device) # dtype和device

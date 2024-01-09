@@ -112,18 +112,19 @@ class StochasticPolicy(nn.Module):
             dist_entropy: (torch.Tensor) action distribution entropy for the given inputs.
             action_distribution: (torch.distributions) action distribution.
         """
+        # 检查输入的dtype和device是否正确，变形到在cuda上的tensor以方便进入网络
         obs = check(obs).to(**self.tpdv)
         rnn_states = check(rnn_states).to(**self.tpdv)
         action = check(action).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
         if available_actions is not None:
             available_actions = check(available_actions).to(**self.tpdv)
-
         if active_masks is not None:
             active_masks = check(active_masks).to(**self.tpdv)
 
+        # 用base提取特征-输入大小obs_shape，输出大小hidden_sizes[-1],
         actor_features = self.base(obs)
-
+        # 如果使用RNN，将特征和RNN状态输入RNN层，得到新的特征和RNN状态
         if self.use_naive_recurrent_policy or self.use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 

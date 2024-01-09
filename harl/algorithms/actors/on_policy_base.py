@@ -6,6 +6,7 @@ from harl.utils.models_tools import update_linear_schedule
 
 
 class OnPolicyBase:
+    # MAPPO and HAPPO inherit from this class
     def __init__(self, args, obs_space, act_space, device=torch.device("cpu")):
         """Initialize Base class.
         Args:
@@ -62,7 +63,7 @@ class OnPolicyBase:
             obs: (np.ndarray) local agent inputs to the actor. 当前时刻obs
             rnn_states_actor: (np.ndarray) if actor has RNN layer, RNN states for actor.
                                 上一时刻的rnn_state
-            masks: (np.ndarray) denotes points at which RNN states should be reset. #TODO: 这是什么，有点像episode结束的信号
+            masks: (np.ndarray) denotes points at which RNN states should be reset.
             available_actions: (np.ndarray) denotes which actions are available to agent
                                  当前智能体的可用动作 (if None, all actions available)
             deterministic: (bool) whether the action should be mode of distribution or should be sampled.

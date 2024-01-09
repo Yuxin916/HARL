@@ -14,7 +14,7 @@ class OnPolicyCriticBufferEP:
             args: (dict) arguments
             share_obs_space: (gym.Space or list) share observation space
         """
-        self.episode_length = args["episode_length"]  # 每个环境的episode长度 TODO：检查env config
+        self.episode_length = args["episode_length"]  # 每个环境的episode长度
         self.n_rollout_threads = args["n_rollout_threads"] # 多进程环境数量
         self.hidden_sizes = args["hidden_sizes"] # critic网络的隐藏层大小
         self.rnn_hidden_size = self.hidden_sizes[-1] # rnn隐藏层大小
@@ -26,13 +26,13 @@ class OnPolicyCriticBufferEP:
 
         self.use_proper_time_limits = args["use_proper_time_limits"]  # 是否考虑episode的提前结束
 
-        share_obs_shape = get_shape_from_obs_space(share_obs_space)  # 获取单个智能体状态空间的形状，tuple of integer. eg: （54，）
+        share_obs_shape = get_shape_from_obs_space(share_obs_space)  # 获取单个智能体共享状态空间的形状，tuple of integer. eg: （54，）
 
         if isinstance(share_obs_shape[-1], list):
             share_obs_shape = share_obs_shape[:1]
 
         """
-        Critic Buffer里储存了： ALL (np.ndarray) NOTE： 所有agent的全局状态是一样的
+        Critic Buffer里储存了： ALL (np.ndarray) NOTE： 在EP中所有agent的全局状态是一样的
         1. self.share_obs: 全局状态 [episode_length + 1, 进程数量, share_obs_shape]
         2. self.rnn_states_critic: critic的rnn状态 [episode_length + 1, 进程数量, recurrent_n, rnn_hidden_size]
         3. self.value_preds: critic的value预测 [episode_length + 1, 进程数量, 1]
@@ -113,10 +113,17 @@ class OnPolicyCriticBufferEP:
     def compute_returns(self, next_value, value_normalizer=None):
         """Compute returns either as discounted sum of rewards, or using GAE.
         Args:
-            next_value: (np.ndarray) value predictions for the step after the last episode step.
+            next_value: (np.ndarray) value predictions for the step after the last episode step. shape=(环境数, 1)
+            # V（s_T+1）
             value_normalizer: (ValueNorm) If not None, ValueNorm value normalizer instance.
-        # next_value --- np.array shape=(环境数, 1) -- 最后一个状态的状态值
-        # self.value_normalizer --- ValueNorm
+            # self.value_normalizer --- ValueNorm
+
+        在下面的计算过程中
+            delta（step）
+            gae(step): (环境数, 1)
+            self.returns  - 【episode_length + 1, 进程数量, 1】 这个episode每一步的Q值
+            self.value_preds - 【episode_length + 1, 进程数量, 1】 这个episode每一步的V值
+            gae = Q - V
         """
         # consider the difference between truncation and termination
         if self.use_proper_time_limits:
@@ -130,28 +137,31 @@ class OnPolicyCriticBufferEP:
                     # 在GAE计算中，将值函数的估计值denormalize，然后再计算GAE，最后再normalize
                     if value_normalizer is not None:
                         # 计算delta[step]
-                        # delta[step] = r([step]) + gamma * V(s[step+1]) * mask - V(s[step]) -- 如果下一个step done
+                        # delta[step] = r([step]) + gamma * V(s[step+1]) * mask - V(s[step]) -- 如果下一个step 不done
                         # delta[step] = r([step]) + gamma * 0 * mask - V(s[step]) -- 如果下一个step done
-                        delta = (
+                        delta = (  # t时刻的delta
                             self.rewards[step]
                             + self.gamma
-                            * value_normalizer.denormalize(self.value_preds[step + 1])
-                            * self.masks[step + 1]
-                            - value_normalizer.denormalize(self.value_preds[step])
+                            * value_normalizer.denormalize(self.value_preds[step + 1])  # 在计算delta的时候denormalize
+                            * self.masks[step + 1]  # 如果下一个step 不done, self.value_preds[step + 1]才存在
+                            - value_normalizer.denormalize(self.value_preds[step]) # 在计算delta的时候denormalize
                         )
 
                         # gae递归公式，查看https://zhuanlan.zhihu.com/p/651944382和笔记
                         # gae[step] = delta[step] + gamma * lambda * mask[t+1] * gae[t+1]
-                        gae = (
+                        gae = (  # 根据t+1时刻的gae计算t时刻的gae
                             delta
-                            + self.gamma * self.gae_lambda * self.masks[step + 1] * gae
+                            +
+                            self.gamma * self.gae_lambda
+                            * self.masks[step + 1]
+                            * gae  # gae在for loop里面迭代, 这个代表的是t+1时刻的gae
                         )
 
                         # 因为分离了terminated和truncated
                         gae = self.bad_masks[step + 1] * gae
 
-                        # V网络的标签值 = GAE(step) + V网络(step) -- 标量
-                        self.returns[step] = gae + value_normalizer.denormalize(self.value_preds[step])
+                        # Q -- V网络的标签值 = GAE(step) + V网络(step) -- 标量
+                        self.returns[step] = gae + value_normalizer.denormalize(self.value_preds[step]) # 在计算Q的时候denormalize
 
                     else:  # do not use ValueNorm
                         delta = (

@@ -1,0 +1,5 @@
+env: "gymma"
+
+env_args:
+  key: "robotarium_gym:HeterogeneousSensorNetwork-v0"
+  time_limit: 1000

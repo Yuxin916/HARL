@@ -1,0 +1,17 @@
+train:
+  coalitions:
+    3_agents:
+      0:
+        capture:
+          0:
+            capture_radius: 0.15
+            id: '000000'
+          1:
+            id: '000001'
+            capture_radius: 0.1
+        
+        predator:
+          0:
+            id: '000010'
+            sensing_radius: 0.3
+          

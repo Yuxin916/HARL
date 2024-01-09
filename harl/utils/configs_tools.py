@@ -68,6 +68,10 @@ def get_task_name(env, env_args):
         task = f"{env_args['scenario']}-{env_args['task']}"
     elif env == "ast":
         task = f"{env_args['scenario']}-{env_args['task']}"
+    elif env == "topo":
+        task = f"{env_args['scenario']}-{env_args['task']}"
+    elif env == "robotarium":
+        task = f"{env_args['scenario']}-{env_args['task']}"
     return task
 
 

@@ -1,0 +1,118 @@
+scenario: HeterogeneousSensorNetwork #name of the folder inside scenarios
+
+#### Robotarium试验场地的边界
+LEFT: -1.4
+RIGHT: 1.4
+UP: -0.9
+DOWN: .9
+# 每个robot每一个时间步移动的距离
+step_dist : 0.2
+# 是否使用随机种子[-1不随机][任意其他数字 随机]
+seed: -1
+# robot的初始位置相距彼此的最小距离
+start_dist: 0.3
+# 是否生成图片 [-1 不要图片] [当发送到Robotarium时是1]
+show_figure_frequency: -1
+#### Robotarium自带的参数
+# 训练时是false, 提交的时候是true
+robotarium: False
+# 是否使用真实的robotarium
+real_time: False
+# 防止robot碰撞的参数
+barrier_certificate: "default" #Can be safe or default for strong or weak barrier certificates
+update_frequency: 29
+
+### 在generate)coalitions.py中，根据这些参数生成coalition(也就是每个agent的特征)
+n_train_agents: 20  # 20个训练agent
+n_test_agents: 20  # 20个测试agent
+n_coalitions: 5  # 5个coalition
+# generate coalition的输出 【环境中会调用这个coalition，所以最好是N个robot分别生成】
+#coalition_file: "test_generate_coalitions.yaml"
+coalition_file: "custom_5_coalitions_4_robots.yaml" # 5组coalition，每组4个robot
+traits:
+  radius:
+    distribution: 'uniform'
+    low: 0.20
+    high: 0.60
+
+n_actions: 5 # 每个agent的动作空间
+n_agents: 4  # 每个coalition中的agent数量
+
+
+### reward相关的参数
+# 给最终的reward乘以一个系数
+dist_reward_multiplier: 1.0
+# 是否计算重叠部分大小
+calculate_total_overlap: True
+# violation=robot collision w/ each other or boundary, does not terminate early
+# 不会提前终止，但是会给一个互相/边界碰撞的惩罚
+penalize_violations: True
+end_ep_on_violation: True
+# 互相/边界碰撞的reward
+violation_penalty: -1.0
+
+### done相关的参数
+# 最大的episode步数
+max_episode_steps: 80
+
+### obs相关的参数
+#Used to determine the adjacency matrix, set to -1 for full communication
+# 用来确定邻接矩阵，-1表示全连接即所有agent都可以通信 #TODO
+delta: -1
+#If the following two are False, make sure resample is also False
+# 是否已知自己的capability
+capability_aware: True
+# 是否已知自己的id
+agent_id: False
+
+### reset相关的参数
+# 是否在每次reset的时候resample agent
+resample: True
+resample_frequency: 5
+# 总共有三种sample agents的方式
+# 第一种方法： 从predefined_coalition.yaml文件中加载coalition (包含训练和测试)
+load_from_predefined_coalitions: True
+# 从predefined_agents.yaml文件中加载训练还是测试的agent
+test: False
+# 是否手动选择coalition，如果是，那么只会从coalition文件中选择coalition_selection第几个team （都是false）
+manual_coalition_selection: False # If true, only uses the coalition_selection team from the coalition file
+coalition_selection: 0  # 第几个team （总共5个
+
+# 第二种方法：
+# 从predefined_coalition.yaml文件中加载所有的coalition下所有的agent，随机组成coalition
+# 所以会出现说，和之前出现过但没有一起合作过的agent合作的情况
+load_from_predefined_agents: False
+
+# 第三种方法：
+# load_agents_from_trait_distribution
+
+# 打乱agent的顺序（发生在已经sample过coalition之后）
+shuffle_agent_order: False
+
+
+
+
+
+
+
+#model_config_file: config.json
+model_file: agent.th
+
+actor_file: gnn_agent
+actor_class: GNNAgent
+
+env_file: HeterogeneousSensorNetwork
+env_class: HeterogeneousSensorNetwork #This needs to have all of the functionalities of a gym to work
+
+episodes: 10 #Number of episodes to run for
+
+
+## 作者 - KEEP FALSE - NOT USED
+#hard_coded_coalition: False
+#dual_channel: False #KEEP FALSE, NOT USED. Changes the observations to make them a 2d array for capabilities and observations if capability_aware is true
+#
+#
+## 没有出现在代码中
+#terminate_on_success: True # If true, then when the number of prey is zero, the environment will terminate. Else environment keeps running.
+#shared_reward: True
+

@@ -16,7 +16,7 @@ class OnPolicyActorBuffer:
             obs_space: (gym.Space or list) observation space # 单个智能体的观测空间 eg: Box (18,)
             act_space: (gym.Space) action space # 单个智能体的动作空间 eg: Discrete(5,)
         """
-        self.episode_length = args["episode_length"]  # 每个环境的episode长度 TODO：检查env config
+        self.episode_length = args["episode_length"]  # 每个环境的episode长度
         self.n_rollout_threads = args["n_rollout_threads"]  # 多进程环境数量
         self.hidden_sizes = args["hidden_sizes"]  # actor网络的隐藏层大小
         self.rnn_hidden_size = self.hidden_sizes[-1]  # rnn隐藏层大小
@@ -83,12 +83,13 @@ class OnPolicyActorBuffer:
         # 当前这个agent在不同并行环境的不同时间点是否存活，如果不存活，那么就不需要计算loss，不需要更新参数
         self.active_masks = np.ones_like(self.masks)
 
-        self.factor = None  #TODO：这是什么
+        self.factor = None
 
         self.step = 0
 
     def update_factor(self, factor):
-        """Save factor for this actor."""
+        """Save factor for this actor.
+        只有on_policy_ha_runner调用了这个函数"""
         self.factor = factor.copy()
 
     def insert(
@@ -234,14 +235,20 @@ class OnPolicyActorBuffer:
 
     def recurrent_generator_actor(self, advantages, actor_num_mini_batch, data_chunk_length):
         """Training data generator for actor that uses RNN network.
+        当actor是RNN时，使用这个生成器。
+        把轨迹分成长度为data_chunk_length的块，因此比naive_recurrent_generator_actor在训练时更有效率。
         This generator splits the trajectories into chunks of length data_chunk_length, 
         and therefore maybe more efficient than the naive_recurrent_generator_actor in training.
         """
 
         # get episode_length, n_rollout_threads, and mini_batch_size
+        # trajectory长度，进程数
         episode_length, n_rollout_threads = self.actions.shape[0:2]
+        # batch_size = 进程数 * trajectory长度 (收集一次数据)
         batch_size = n_rollout_threads * episode_length
+        # 把所有时间步根据data_chunk_length分成多个组时间步
         data_chunks = batch_size // data_chunk_length
+        # 把data_chunks分成actor_num_mini_batch份
         mini_batch_size = data_chunks // actor_num_mini_batch
 
         assert episode_length % data_chunk_length == 0, (
@@ -333,6 +340,7 @@ class OnPolicyActorBuffer:
             old_action_log_probs_batch = _flatten(L, N, old_action_log_probs_batch)
             adv_targ = _flatten(L, N, adv_targ)
             if self.factor is not None:
+                # 注意以下这里的factor - happo
                 yield obs_batch, rnn_states_batch, actions_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch, factor_batch
             else:
                 yield obs_batch, rnn_states_batch, actions_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch

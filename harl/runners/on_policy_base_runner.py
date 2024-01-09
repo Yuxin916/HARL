@@ -14,6 +14,7 @@ from harl.utils.trans_tools import _t2n
 from harl.utils.envs_tools import (
     make_eval_env,
     make_train_env,
+    make_train_env_robo,
     make_render_env,
     set_seed,
     get_num_agents,
@@ -41,9 +42,9 @@ class OnPolicyBaseRunner:
         self.hidden_sizes = algo_args["model"]["hidden_sizes"]  # MLP隐藏层神经元数量
         self.rnn_hidden_size = self.hidden_sizes[-1]  # RNN隐藏层神经元数量
         self.recurrent_n = algo_args["model"]["recurrent_n"]  # RNN的层数
-        self.action_aggregation = algo_args["algo"]["action_aggregation"]  # TODO：这是什么
+        self.action_aggregation = algo_args["algo"]["action_aggregation"]  # 多维动作空间的聚合方式，如mean/prod
         self.share_param = algo_args["algo"]["share_param"]  # actor是否共享参数
-        self.fixed_order = algo_args["algo"]["fixed_order"]  # TODO：这是什么
+        self.fixed_order = algo_args["algo"]["fixed_order"]  # 是否固定agent的策略更新顺序
         set_seed(algo_args["seed"])  # 设置随机种子
         self.device = init_device(algo_args["device"])  # 设置设备
 
@@ -58,7 +59,7 @@ class OnPolicyBaseRunner:
                 algo_args["seed"]["seed"],
                 logger_path=algo_args["logger"]["log_dir"],
             )
-            # 保存algo，env，args所有config
+            # 保存algo，env args，algo args所有config
             save_config(args, algo_args, env_args, self.run_dir)
 
         # set the title of the process
@@ -67,7 +68,7 @@ class OnPolicyBaseRunner:
             str(args["algo"]) + "-" + str(args["env"]) + "-" + str(args["exp_name"])
         )
 
-        # 使用env tools中的函数创建训练/测试/render环境 （调取环境+插入config）
+        # 使用env tools中的函数创建训练/测试/render环境 （调取环境+插入env config）
         if self.algo_args["render"]["use_render"]:
             # 创建单线程render环境
             (
@@ -79,26 +80,35 @@ class OnPolicyBaseRunner:
             ) = make_render_env(args["env"], algo_args["seed"]["seed"], env_args)
 
         else:
-            # 创建多线程训练环境
-            self.envs = make_train_env(
-                args["env"],
-                algo_args["seed"]["seed"],
-                algo_args["train"]["n_rollout_threads"],
-                env_args,
-            )
-            # 创建多线程测试环境
-            self.eval_envs = (
-                make_eval_env(
+            if args["env"] == "robotarium":
+                self.envs = make_train_env_robo(algo_args["train"]["n_rollout_threads"],
+                                                algo_args["seed"]["seed"],
+                                                env_args)
+            else:
+                # 创建多线程训练环境
+                self.envs = make_train_env(
                     args["env"],
                     algo_args["seed"]["seed"],
-                    algo_args["eval"]["n_eval_rollout_threads"],
+                    algo_args["train"]["n_rollout_threads"],
                     env_args,
                 )
-                if algo_args["eval"]["use_eval"]
-                else None
-            )
+                # 创建多线程测试环境
+                self.eval_envs = (
+                    make_eval_env(
+                        args["env"],
+                        algo_args["seed"]["seed"],
+                        algo_args["eval"]["n_eval_rollout_threads"],
+                        env_args,
+                    )
+                    if algo_args["eval"]["use_eval"]
+                    else None
+                )
 
-        self.state_type = env_args.get("state_type", "EP")  # TODO： EP or FP need to be added to env args
+        # 默认使用EP作为state_type
+        # EP：EnvironmentProvided global state (EP)：环境提供的全局状态
+        # FP：Featured-Pruned Agent-Specific Global State (FP)： 特征裁剪的特定智能体全局状态
+        self.state_type = env_args.get("state_type", "EP")
+        # TODO： EP or FP need to be added to customized env
 
         # 智能体数量
         self.num_agents = get_num_agents(args["env"], env_args, self.envs)
@@ -115,8 +125,8 @@ class OnPolicyBaseRunner:
             # 初始化actor网络，进入mappo.py
             agent = ALGO_REGISTRY[args["algo"]](
                 {**algo_args["model"], **algo_args["algo"]},  # yaml里model和algo的config打包作为args进入OnPolicyBase
-                self.envs.observation_space[0],
-                self.envs.action_space[0],
+                self.envs.observation_space[0], # 单个agent的观测空间
+                self.envs.action_space[0], # 单个agent的动作空间
                 device=self.device,
             )
             # 因为共享参数，所以self.actor列表中只有一个actor，即所有agent共用一套actor网络
@@ -136,7 +146,7 @@ class OnPolicyBaseRunner:
                 self.actor.append(self.actor[0])
                 # self.actor是一个list，里面有N个一模一样的actor，
 
-        # actor不共享参数 TODO：还没看
+        # actor不共享参数
         else:
             self.actor = []
             for agent_id in range(self.num_agents):
@@ -147,7 +157,7 @@ class OnPolicyBaseRunner:
                     self.envs.action_space[agent_id],
                     device=self.device,
                 )
-                # 因为共享参数，所以self.actor列表中有N个actor，所有agent每人一套actor网络
+                # 因为不共享参数，所以self.actor列表中有N个actor，所有agent每人一套actor网络
                 self.actor.append(agent)
 
         # 训练
@@ -166,12 +176,14 @@ class OnPolicyBaseRunner:
             # 单个agent的share obs space eg: Box(-inf, inf, (54,), float32)
             share_observation_space = self.envs.share_observation_space[0]
 
+            # 创建centralized critic网络
             self.critic = VCritic(
                 {**algo_args["model"], **algo_args["algo"]},  # yaml里model和algo的config打包作为args进入VCritic
-                share_observation_space,  # 中心式的值函数centralized critic的输入是agent的share_observation_space dim
+                share_observation_space,  # 中心式的值函数centralized critic的输入是单个agent拿到的share_observation_space dim
                 device=self.device,
             )
 
+            # 创建centralized critic网络的buffer（1个）
             # MAPPO trick: 原始论文section 5.2
             if self.state_type == "EP":
                 # EP stands for Environment Provided, as phrased by MAPPO paper.
@@ -201,7 +213,7 @@ class OnPolicyBaseRunner:
             else:
                 self.value_normalizer = None
 
-            # TODO：环境的logger，重写
+            # 环境的logger
             self.logger = LOGGER_REGISTRY[args["env"]](
                 args, algo_args, env_args, self.num_agents, self.writter, self.run_dir
             )
@@ -253,13 +265,13 @@ class OnPolicyBaseRunner:
                 episode
             )  # logger callback at the beginning of each episode
 
-            # 把actor和critic网络都切换到eval模式 #TODO：为什么
+            # 把actor和critic网络都切换到eval模式
             self.prep_rollout()  # change to eval mode
 
             # 对于这一个episode的每一个时间步
             for step in range(self.algo_args["train"]["episode_length"]):
                 """
-                采样动作
+                采样动作 - 进入actor network 
                 values: (n_threads, 1)
                 actions: (n_threads, n_agents, action_dim)
                 action_log_probs: (n_threads, n_agents, 1)
@@ -313,13 +325,15 @@ class OnPolicyBaseRunner:
                 """把这一步的数据存入每一个actor的replay buffer 以及 集中式critic的replay buffer"""
                 self.insert(data)  # insert data into buffer
 
-            # compute return and update network
+            # 收集完了一个episode的所有timestep data，开始计算return，更新网络
+            # compute Q and V using GAE or not
             self.compute()
 
             # 结束这一个episode的交互数据收集
             # 把actor和critic网络都切换回train模式
             self.prep_training()
 
+            # 从这里开始，mappo和happo不一样了
             actor_train_infos, critic_train_info = self.train()
 
             # log information
@@ -338,6 +352,7 @@ class OnPolicyBaseRunner:
                     self.eval()
                 self.save()
 
+            # 把上一个episode产生的最后一个timestep的state放入buffer的新的episode的第一个timestep
             self.after_update()
 
     def warmup(self):
@@ -404,7 +419,7 @@ class OnPolicyBaseRunner:
         # 给actor[agent_id]输入:  (有关输入可以参考OnPolicyActorBuffer的初始化)
             - 当前时刻obs
             - 上一时刻的rnn_state
-            - mask（？）
+            - mask (done or not)
             - 当前智能体的可用动作
             - bool(有没有available_actions)
         # 输出:
@@ -412,7 +427,7 @@ class OnPolicyBaseRunner:
             - action_log_prob
             - rnn_state(actor)
         """
-
+        # 对于每一个agent来说
         for agent_id in range(self.num_agents):
             # self.actor[agent_id].get_actions参考OnPolicyBase
             action, action_log_prob, rnn_state = self.actor[agent_id].get_actions(
@@ -435,7 +450,7 @@ class OnPolicyBaseRunner:
 
         """
         然后是critic的收集 - 伪代码14行
-        两种情况：每个agent的全局状态是否一样 
+        两种情况：critic的输入是所有agent obs的concate起来(EP)还是经过处理(FP)
         # 给critic输入:
             - 当前时刻的share_obs
             - 上一时刻的rnn_state_critic
@@ -445,6 +460,7 @@ class OnPolicyBaseRunner:
             - rnn_state_critic
         """
         # collect values, rnn_states_critic from 1 critic
+        # 参考v_critics.py
         if self.state_type == "EP":
             value, rnn_state_critic = self.critic.get_values(
                 self.critic_buffer.share_obs[step],
@@ -613,7 +629,7 @@ class OnPolicyBaseRunner:
         Compute critic evaluation of the last state, V（s-T）
         and then let buffer compute returns, which will be used during training.
         """
-        # 计算critic的最后一个state的值  #TODO self.collect里面没计算吗
+        # 计算critic的最后一个state的值
         if self.state_type == "EP":
             next_value, _ = self.critic.get_values(
                 self.critic_buffer.share_obs[-1],
@@ -862,7 +878,9 @@ class OnPolicyBaseRunner:
                 self.envs.save_replay()
 
     def prep_rollout(self):
-        """Prepare for rollout."""
+        """Prepare for rollout.
+        把actor和critic网络都切换到eval模式
+        """
 
         # 每一个actor
         for agent_id in range(self.num_agents):
@@ -874,7 +892,8 @@ class OnPolicyBaseRunner:
         self.critic.prep_rollout()
 
     def prep_training(self):
-        """Prepare for training."""
+        """Prepare for training.
+        把actor和critic网络都切换回train模式"""
         for agent_id in range(self.num_agents):
             # 开始准备训练 actor_policy.train()
             self.actor[agent_id].prep_training()

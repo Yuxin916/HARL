@@ -22,12 +22,13 @@ class VCritic:
         self.tpdv = dict(dtype=torch.float32, device=device)  # dtype和device
 
         self.clip_param = args["clip_param"]  # PPO的clip参数
+
         #TODO: PPO相关 在下面的update函数中用到 对应
         self.critic_epoch = args["critic_epoch"]
         self.critic_num_mini_batch = args["critic_num_mini_batch"]
         self.data_chunk_length = args["data_chunk_length"]
         self.value_loss_coef = args["value_loss_coef"]
-        self.max_grad_norm = args["max_grad_norm"]
+        self.max_grad_norm = args["max_grad_norm"]  # The maximum value for the gradient clipping
         self.huber_delta = args["huber_delta"]
 
         self.use_recurrent_policy = args["use_recurrent_policy"]
@@ -43,7 +44,7 @@ class VCritic:
 
         self.share_obs_space = cent_obs_space  # 共享观测空间/全局状态空间 eg. Box(-inf, inf, (54,), float32)
 
-        # 初始化critic网络，输入为共享观测空间，输出为1维分数R
+        # 初始化critic网络，输入为单个agent的共享观测空间，输出为1维分数R+rnn_state
         self.critic = VNet(args, self.share_obs_space, self.device)
 
         # 初始化critic网络的优化器
@@ -127,6 +128,13 @@ class VCritic:
             value_loss: (torch.Tensor) value function loss.
             critic_grad_norm: (torch.Tensor) gradient norm from critic update.
         """
+        """
+        share_obs_batch: (torch.Tensor) agent的共享观测，shape为【n_rollout_threads * episode_length, *share_obs_shape】
+        rnn_states_critic_batch: (torch.Tensor) critic的RNN状态，shape为[mini_batch_size, 1, rnn_hidden_dim]
+        value_preds_batch: (torch.Tensor) critic的预测值，shape为【n_rollout_threads * episode_length, 1】
+        return_batch: (torch.Tensor) agent的reward to go，shape为【n_rollout_threads * episode_length, 1】
+        masks_batch: (torch.Tensor) agent的masks，shape为【n_rollout_threads * episode_length, 1】
+        """
         (
             share_obs_batch,
             rnn_states_critic_batch,
@@ -135,6 +143,7 @@ class VCritic:
             masks_batch,
         ) = sample
 
+        # 检查数据类型
         value_preds_batch = check(value_preds_batch).to(**self.tpdv)
         return_batch = check(return_batch).to(**self.tpdv)
 
@@ -142,6 +151,7 @@ class VCritic:
             share_obs_batch, rnn_states_critic_batch, masks_batch
         )
 
+        # 计算critic的loss
         value_loss = self.cal_value_loss(
             values, value_preds_batch, return_batch, value_normalizer=value_normalizer
         )
@@ -175,6 +185,7 @@ class VCritic:
         train_info["value_loss"] = 0
         train_info["critic_grad_norm"] = 0
 
+        # critic_epoch是critic更新的次数
         for _ in range(self.critic_epoch):
             if self.use_recurrent_policy:
                 data_generator = critic_buffer.recurrent_generator_critic(
@@ -188,8 +199,9 @@ class VCritic:
                 data_generator = critic_buffer.feed_forward_generator_critic(
                     self.critic_num_mini_batch
                 )
-
+            # sample出
             for sample in data_generator:
+                # 计算critic的loss并且更新
                 value_loss, critic_grad_norm = self.update(
                     sample, value_normalizer=value_normalizer
                 )
