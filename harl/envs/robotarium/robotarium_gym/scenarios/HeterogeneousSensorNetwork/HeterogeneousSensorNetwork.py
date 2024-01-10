@@ -323,7 +323,7 @@ class HeterogeneousSensorNetwork(BaseEnv):
         self.episode_return += rewards
 
         # terminate if needed
-        if self.episode_steps > self.args.max_episode_steps:
+        if self.episode_steps >= self.args.max_episode_steps:
             terminated = True
             rew_metric_info["episode_return"] = self.episode_return
 
@@ -332,6 +332,11 @@ class HeterogeneousSensorNetwork(BaseEnv):
         }
         # 添加info
         info.update(rew_metric_info)
+
+        # 如果episode结束，给info添加episode_return
+        if terminated:
+            info["episode_return"] = self.episode_return
+            info["episode_steps"] = self.episode_steps
 
         return obs, [rewards] * self.num_robots, [terminated] * self.num_robots, [info] * self.num_robots
 

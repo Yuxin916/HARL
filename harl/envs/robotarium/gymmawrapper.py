@@ -19,8 +19,6 @@ class TimeLimit(GymTimeLimit):
         self._max_episode_steps = max_episode_steps
         self._elapsed_steps = None
 
-
-
     def step(self, action):
         assert (
                 self._elapsed_steps is not None
@@ -120,7 +118,7 @@ class _GymmaWrapper(MultiAgentEnv):
             )
             for o in self._obs
         ]
-
+        reward = [x * len(reward) for x in reward]
         return [[item] for item in reward], np.array(done), info
 
     def get_num_agents(self):
