@@ -23,7 +23,7 @@ class VCritic:
 
         self.clip_param = args["clip_param"]  # PPO的clip参数
 
-        #TODO: PPO相关 在下面的update函数中用到 对应
+        # TODO: PPO相关 在下面的update函数中用到对应
         self.critic_epoch = args["critic_epoch"]
         self.critic_num_mini_batch = args["critic_num_mini_batch"]
         self.data_chunk_length = args["data_chunk_length"]
@@ -79,7 +79,7 @@ class VCritic:
         return values, rnn_states_critic
 
     def cal_value_loss(
-        self, values, value_preds_batch, return_batch, value_normalizer=None
+            self, values, value_preds_batch, return_batch, value_normalizer=None
     ):
         """Calculate value function loss.
         Args:
@@ -96,7 +96,7 @@ class VCritic:
         if value_normalizer is not None:
             value_normalizer.update(return_batch)
             error_clipped = (
-                value_normalizer.normalize(return_batch) - value_pred_clipped
+                    value_normalizer.normalize(return_batch) - value_pred_clipped
             )
             error_original = value_normalizer.normalize(return_batch) - values
         else:

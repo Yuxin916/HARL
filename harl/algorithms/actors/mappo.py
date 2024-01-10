@@ -23,9 +23,8 @@ class MAPPO(OnPolicyBase):
         self.ppo_epoch = args["ppo_epoch"]  # Number of epoch when optimizing the surrogate loss
         self.actor_num_mini_batch = args["actor_num_mini_batch"]
         self.entropy_coef = args["entropy_coef"]  # Entropy coefficient for the loss calculation
-        self.use_max_grad_norm = args["use_max_grad_norm"] # TODO PPO相关
+        self.use_max_grad_norm = args["use_max_grad_norm"]  # TODO PPO相关
         self.max_grad_norm = args["max_grad_norm"]  # maximum value for the gradient clipping
-
 
     def update(self, sample):
         """Update actor network.

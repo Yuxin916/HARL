@@ -58,16 +58,20 @@ class OnPolicyBase:
     def get_actions(
         self, obs, rnn_states_actor, masks, available_actions=None, deterministic=False
     ):
-        """Compute actions for the given inputs.
-        Args:
-            obs: (np.ndarray) local agent inputs to the actor. 当前时刻obs
+        """Compute actions for the given inputs. 可以对应OnPolicyActorBuffer中在某一个step下的信息
+        输入:
+            obs: (np.ndarray) local agent inputs to the actor. 所有环境下当前时刻某个agent的obs 【thread_num, obs_dim】
             rnn_states_actor: (np.ndarray) if actor has RNN layer, RNN states for actor.
-                                上一时刻的rnn_state
-            masks: (np.ndarray) denotes points at which RNN states should be reset.
+                                上一时刻的rnn_state 【thread_num, rnn层数，rnn_state_dim】
+            masks: (np.ndarray) denotes points at which RNN states should be reset. 【thread_num, 1】
             available_actions: (np.ndarray) denotes which actions are available to agent
-                                 当前智能体的可用动作 (if None, all actions available)
+                                 当前智能体的可用动作 (if None, all actions available) 【thread_num, act_dim】
             deterministic: (bool) whether the action should be mode of distribution or should be sampled.
-                                有没有available_actions，离散还是连续动作
+                                有没有available_actions
+        输出:
+            actions: (torch.Tensor) actions for the given inputs. 【thread_num, 1】
+            action_log_probs: (torch.Tensor) log probabilities of actions. 【thread_num, 1】
+            rnn_states_actor: (torch.Tensor) updated RNN states for actor. 【thread_num, rnn层数，rnn_state_dim】
         """
         actions, action_log_probs, rnn_states_actor = self.actor(
             obs, rnn_states_actor, masks, available_actions, deterministic

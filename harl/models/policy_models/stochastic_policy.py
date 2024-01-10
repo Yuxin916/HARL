@@ -29,7 +29,7 @@ class StochasticPolicy(nn.Module):
         self.use_naive_recurrent_policy = args["use_naive_recurrent_policy"]  # TODO：二者的区别是什么
         self.use_recurrent_policy = args["use_recurrent_policy"]
         # number of recurrent layers
-        self.recurrent_n = args["recurrent_n"] # RNN层数
+        self.recurrent_n = args["recurrent_n"]  # RNN层数
         self.tpdv = dict(dtype=torch.float32, device=device) # dtype和device
 
         obs_shape = get_shape_from_obs_space(obs_space)  # 获取观测空间的形状，tuple of integer. eg: （18，）
@@ -70,9 +70,9 @@ class StochasticPolicy(nn.Module):
                                                               (if None, all actions available)
             deterministic: (bool) whether to sample from action distribution or return the mode.
         Returns:
-            actions: (torch.Tensor) actions to take.
-            action_log_probs: (torch.Tensor) log probabilities of taken actions.
-            rnn_states: (torch.Tensor) updated RNN hidden states.
+            actions: (torch.Tensor) actions to take. 【thread_num, 1】
+            action_log_probs: (torch.Tensor) log probabilities of taken actions. 【thread_num, 1】
+            rnn_states: (torch.Tensor) updated RNN hidden states. 【thread_num, rnn层数，rnn_state_dim】
         """
         # 检查输入的dtype和device是否正确，变形到在cuda上的tensor以方便进入网络
         obs = check(obs).to(**self.tpdv)

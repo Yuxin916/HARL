@@ -77,14 +77,17 @@ class OnPolicyActorBuffer:
         )
 
         # Buffer for masks of this actor. Masks denotes at which point should the rnn states be reset.
+        # 当前这个agent在不同并行环境的不同时间点是否done，如果done，那么就需要reset rnn
         self.masks = np.ones((self.episode_length + 1, self.n_rollout_threads, 1), dtype=np.float32)
 
         # Buffer for active masks of this actor. Active masks denotes whether the agent is alive.
         # 当前这个agent在不同并行环境的不同时间点是否存活，如果不存活，那么就不需要计算loss，不需要更新参数
         self.active_masks = np.ones_like(self.masks)
 
+        # happo的参数
         self.factor = None
 
+        # 当前所有并行环境的当前步数
         self.step = 0
 
     def update_factor(self, factor):
