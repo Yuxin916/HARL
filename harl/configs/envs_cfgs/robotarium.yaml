@@ -1,4 +1,4 @@
-scenario: HSN
-task: test-4
+scenario: MT
+task: 6_3_3
 
-n_agents: 4
+n_agents: 6

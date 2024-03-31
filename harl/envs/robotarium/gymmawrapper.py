@@ -118,7 +118,8 @@ class _GymmaWrapper(MultiAgentEnv):
             )
             for o in self._obs
         ]
-        reward = [x * len(reward) for x in reward]
+        # reward = [x * len(reward) for x in reward]
+        reward = [x for x in reward]
         return [[item] for item in reward], np.array(done), info
 
     def get_num_agents(self):

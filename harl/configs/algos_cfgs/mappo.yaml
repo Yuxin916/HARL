@@ -13,14 +13,14 @@ device:
   torch_threads: 4
 train:
   # number of parallel environments for training data collection
-  n_rollout_threads: 16 # FIXED
+  n_rollout_threads: 24 # FIXED
   # number of total training steps
   num_env_steps: 10000000
   # number of steps per environment per training data collection
   episode_length: 200
-  # logging interval
+  # logging interval （每隔多少个episode记录一次）
   log_interval: 5
-  # evaluation interval
+  # evaluation interval （每隔多少个episode进行一次evaluation）
   eval_interval: 25
   # whether to use ValueNorm
   use_valuenorm: True

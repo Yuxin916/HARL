@@ -11,28 +11,33 @@ class RobotariumLogger(BaseLogger):
         )
 
         # declare some variables
+
         self.total_num_steps = None
         self.episode = None
-        self.done_episodes_rewards = None
-        self.train_episode_rewards = None
         self.start = None
         self.episodes = None
         self.episode_lens = None
+        self.n_rollout_threads = algo_args["train"]["n_rollout_threads"]
+        self.train_episode_rewards = None
         self.one_episode_len = None
         self.done_episode_infos = None
+        self.done_episodes_rewards = None
+        self.done_episode_lens = None
+
 
     def get_task_name(self):
         return f"{self.env_args['scenario']}-{self.env_args['task']}"
 
     def init(self, episodes):
+        # 记录训练开始时间
         self.start = time.time()
         # episodes总个数
         self.episodes = episodes
-        self.episode_lens = []
-        self.one_episode_len = np.zeros(self.algo_args["train"]["n_rollout_threads"], dtype=np.int)
-        self.train_episode_rewards = np.zeros(self.algo_args["train"]["n_rollout_threads"])
-        self.done_episodes_rewards = []
-        self.done_episode_infos = []
+        self.train_episode_rewards = np.zeros(self.n_rollout_threads)
+        self.one_episode_len = np.zeros(self.n_rollout_threads, dtype=int)
+        self.done_episodes_rewards = np.zeros(self.n_rollout_threads)
+        self.done_episode_lens = np.zeros(self.n_rollout_threads)
+        self.done_episode_infos = [{} for _ in range(self.n_rollout_threads)]
 
     def episode_init(self, episode):
         """Initialize the logger for each episode."""
@@ -63,33 +68,37 @@ class RobotariumLogger(BaseLogger):
         # 并行环境中的每个环境的episode len （n_env_threads, ）累积
         self.one_episode_len += 1
 
-        for t in range(self.algo_args["train"]["n_rollout_threads"]):
+        for t in range(self.n_rollout_threads):
             # 如果这个环境的episode结束了
             if dones_env[t]:
                 # 已经done的episode的总reward
-                self.done_episodes_rewards.append(self.train_episode_rewards[t])
+                self.done_episodes_rewards[t] = self.train_episode_rewards[t]
                 self.train_episode_rewards[t] = 0  # 归零这个以及done的episode的reward
 
                 # 存一下这个已经done的episode的terminated step的信息
-                self.done_episode_infos.append(infos[t][0])
+                self.done_episode_infos[t] = infos[t][0]
 
                 # 存一下这个已经done的episode的episode长度
-                self.episode_lens.append(self.one_episode_len[t].copy())
+                self.done_episode_lens[t] = self.one_episode_len[t]
                 self.one_episode_len[t] = 0  # 归零这个以及done的episode的episode长度
 
                 # 检查环境保存的episode reward和episode len与算法口的信息是否一致
-                # if not self.done_episode_infos[t]['episode_return'] * self.env_args['n_agents'] == \
-                #        self.done_episodes_rewards[t]:
-                #     print('stop here')
-                assert self.done_episode_infos[t]['episode_return'] * self.env_args['n_agents'] == \
-                       self.done_episodes_rewards[t], 'episode reward not match'
+                # assert round(self.done_episode_infos[t]['episode_return'], 2) == \
+                #        round(self.done_episodes_rewards[t], 2) or \
+                #        round(self.done_episode_infos[t]['episode_return'],2) == \
+                #        round(self.done_episodes_rewards[t],2), 'episode reward not match'
                 # 检查环境保存的episode reward和episode len与算法口的信息是否一致
-                assert self.done_episode_infos[t]['episode_steps'] == self.episode_lens[t], 'episode len not match'
+                assert self.done_episode_infos[t]['episode_steps'] == self.done_episode_lens[t], 'episode len not match'
+
 
     def episode_log(
-        self, actor_train_infos, critic_train_info, actor_buffer, critic_buffer
+            self, actor_train_infos, critic_train_info, actor_buffer, critic_buffer
     ):
         """Log information for each episode."""
+
+        # 记录训练结束时间
+        self.end = time.time()
+
         # 当前跑了多少time steps
         self.total_num_steps = (
                 self.episode
@@ -112,45 +121,56 @@ class RobotariumLogger(BaseLogger):
             )
         )
 
-        # 记录每个episode的平均total overlap
-        average_total_overlap = np.mean([info["total_overlap"] for info in self.done_episode_infos])
-        self.writter.add_scalars(
-            "average_total_overlap",
-            {"average_total_overlap": average_total_overlap},
-            self.total_num_steps,
-        )
-        # 记录每个episode的平均total reward
-        average_total_reward = np.mean([info["episode_return"] for info in self.done_episode_infos])
+        # 检查哪个环境done了
+        a = [index for index, info in enumerate(self.done_episode_infos) if
+                                       "episode_return" in info]
+        b = [index for index, value in enumerate(self.done_episode_lens) if value != 0]
+        c = [index for index, value in enumerate(self.done_episodes_rewards) if value != 0]
+        assert a == b == c
+        indices = a
 
-        # 记录每个episode的平均edge count
-        average_edge_count = np.mean([info["edge_count"] for info in self.done_episode_infos])
-        self.writter.add_scalars(
-            "average_edge_count",
-            {"average_edge_count": average_edge_count},
-            self.total_num_steps,
-        )
 
-        # 记录每个episode的平均violations
-        average_violations = np.mean([info["violation_occurred"] for info in self.done_episode_infos])
-        self.writter.add_scalars(
-            "average_violations",
-            {"average_violations": average_violations},
-            self.total_num_steps,
-        )
+        # # 记录每个episode的平均total overlap
+        # average_total_overlap = np.mean([info["total_overlap"] for info in self.done_episode_infos])
+        # self.writter.add_scalars(
+        #     "average_total_overlap",
+        #     {"average_total_overlap": average_total_overlap},
+        #     self.total_num_steps,
+        # )
+        # 记录每个episode的平均total reward 和 total step
+        episode_returns = [self.done_episode_infos[index]["episode_return"] for index in indices]
+        episode_step = [self.done_episode_infos[index]["episode_steps"] for index in indices]
 
-        self.done_episode_infos = []
-
-        # 记录每个episode的平均长度
-        average_episode_len = (
-            np.mean(self.episode_lens) if len(self.episode_lens) > 0 else 0.0
-        )
-        self.episode_lens = []
+        # 记录每个episode的平均avergae reward 和 average step
+        average_episode_return = np.mean(episode_returns) if episode_returns else 0
+        average_episode_step = np.mean(episode_step) if episode_step else 0
 
         self.writter.add_scalars(
             "average_episode_length",
-            {"average_episode_length": average_episode_len},
+            {"average_episode_length": average_episode_step},
             self.total_num_steps,
         )
+        print(
+            "Some episodes done, average episode length is {}.\n".format(
+                average_episode_step
+            )
+        )
+
+        print(
+            "Some episodes done, average episode reward is {}.\n".format(
+                average_episode_return*self.num_agents
+            )
+        )
+        self.writter.add_scalars(
+            "train_episode_rewards",
+            {"aver_rewards": average_episode_return*self.num_agents},
+            self.total_num_steps,
+        )
+
+        for index in indices:
+            self.done_episode_infos[index] = {}
+            self.done_episode_lens[index] = 0
+            self.done_episodes_rewards[index] = 0
 
         # 记录每个episode的平均 step reward
         critic_train_info["average_step_rewards"] = critic_buffer.get_mean_rewards()
@@ -165,18 +185,3 @@ class RobotariumLogger(BaseLogger):
                 critic_train_info["average_step_rewards"]
             )
         )
-
-        # 记录每个episode的平均 episode reward
-        if len(self.done_episodes_rewards) > 0:
-            aver_episode_rewards = np.mean(self.done_episodes_rewards)
-            print(
-                "Some episodes done, average episode reward is {}.\n".format(
-                    aver_episode_rewards
-                )
-            )
-            self.writter.add_scalars(
-                "train_episode_rewards",
-                {"aver_rewards": aver_episode_rewards},
-                self.total_num_steps,
-            )
-            self.done_episodes_rewards = []

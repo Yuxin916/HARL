@@ -426,3 +426,4 @@ tags
 /harl/envs/robotarium/robotarium_gym/scenarios/HeterogeneousSensorNetwork/test_config.yaml
 /tuned_configs/pettingzoo_mpe/simple_spread_v2-discrete/mappo/mappo_study_config_delete_later.json
 /tuned_configs/pettingzoo_mpe/simple_spread_v2-discrete/happo/happo_study_config_delete_later.json
+/harl/envs/robotarium/
