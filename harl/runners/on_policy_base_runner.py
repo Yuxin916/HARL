@@ -143,9 +143,8 @@ class OnPolicyBaseRunner:
                 assert (
                         self.envs.action_space[agent_id] == self.envs.action_space[0]
                 ), "Agents have heterogeneous action spaces, parameter sharing is not valid."
-
-                # self.actor是一个list，里面有N个一模一样的actor，
                 self.actor.append(self.actor[0])
+                # self.actor是一个list，里面有N个一模一样的actor，
 
         # actor不共享参数
         else:
@@ -234,8 +233,7 @@ class OnPolicyBaseRunner:
         # 开始训练
         print("start running")
 
-        # 在所有并行环境reset之后返回的obs，share_obs，available_actions
-        # 存入每一个actor的replay buffer 以及 集中式critic的replay buffer的t=0时刻里
+        # 在环境reset之后返回的obs，share_obs，available_actions存入每一个actor的replay buffer 以及 集中式critic的replay buffer
         self.warmup()
 
         # 计算总共需要跑多少个episode = 总训练时间步数 / 每个episode的时间步数 / 并行的环境数 (int)
@@ -249,7 +247,7 @@ class OnPolicyBaseRunner:
         self.logger.init(episodes)  # logger callback at the beginning of training
 
         # 开始训练！！！！！！
-        # 对于每一个episode (episode index从1开始)
+        # 对于每一个episode
         for episode in range(1, episodes + 1):
             # 学习率是否随着episode线性递减
             if self.algo_args["train"]["use_linear_lr_decay"]:

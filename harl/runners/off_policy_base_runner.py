@@ -10,6 +10,7 @@ from harl.utils.trans_tools import _t2n
 from harl.utils.envs_tools import (
     make_eval_env,
     make_train_env,
+    make_train_env_robo,
     make_render_env,
     set_seed,
     get_num_agents,
@@ -75,22 +76,27 @@ class OffPolicyBaseRunner:
                 self.env_num,
             ) = make_render_env(args["env"], algo_args["seed"]["seed"], env_args)
         else:  # make envs for training and evaluation
-            self.envs = make_train_env(
-                args["env"],
-                algo_args["seed"]["seed"],
-                algo_args["train"]["n_rollout_threads"],
-                env_args,
-            )
-            self.eval_envs = (
-                make_eval_env(
+            if args["env"] == "robotarium":
+                self.envs = make_train_env_robo(algo_args["train"]["n_rollout_threads"],
+                                                algo_args["seed"]["seed"],
+                                                env_args)
+            else:
+                self.envs = make_train_env(
                     args["env"],
                     algo_args["seed"]["seed"],
-                    algo_args["eval"]["n_eval_rollout_threads"],
+                    algo_args["train"]["n_rollout_threads"],
                     env_args,
                 )
-                if algo_args["eval"]["use_eval"]
-                else None
-            )
+                self.eval_envs = (
+                    make_eval_env(
+                        args["env"],
+                        algo_args["seed"]["seed"],
+                        algo_args["eval"]["n_eval_rollout_threads"],
+                        env_args,
+                    )
+                    if algo_args["eval"]["use_eval"]
+                    else None
+                )
         self.num_agents = get_num_agents(args["env"], env_args, self.envs)
         self.agent_deaths = np.zeros(
             (self.algo_args["train"]["n_rollout_threads"], self.num_agents, 1)

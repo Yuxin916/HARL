@@ -37,7 +37,7 @@ class MAPPO(OnPolicyBase):
             imp_weights: (torch.Tensor) importance sampling weights.
         """
         """
-            obs_batch: 【n_rollout_threads * episode_length, *obs_shape】
+            obs_batch: 【n_rollout_threads * episode_length * num_agents, *obs_shape】
             rnn_states_batch: [mini_batch_size, 1, rnn_hidden_dim]
             actions_batch: 【n_rollout_threads * episode_length, *act_shape=1】
             masks_batch: 【n_rollout_threads * episode_length, *mask=1】
