@@ -14,7 +14,7 @@ set_logger(path_convert('./'), file_log_level="ERROR", terminal_log_level='INFO'
 
 if __name__ == '__main__':
     # base env
-    sumo_cfg = path_convert("bottleneck_map/scenario.sumocfg")
+    sumo_cfg = path_convert("bottleneck_map_small/scenario.sumocfg")
     num_seconds = 1500  # 秒
     vehicle_action_type = 'lane_continuous_speed'
     use_gui = True
