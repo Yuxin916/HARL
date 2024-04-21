@@ -177,8 +177,15 @@ class VehEnvWrapper(gym.Wrapper):
                 front_vehicle = traci.vehicle.getLeader(vehicle_id)
                 if front_vehicle not in [None, ()] and front_vehicle[0] != '':  # 有可能是空的
                     front_vehicle_lane = traci.vehicle.getLaneID(front_vehicle[0])
+                    front_vehicle_lane_index = int(front_vehicle_lane.split('_')[-1])
+                    front_vehicle_road_id = front_vehicle_lane.split('_')[0]
+
                     ego_lane = state['vehicle'][vehicle_id]['lane_id']
-                    if front_vehicle_lane != ego_lane:
+                    ego_lane_index = int(ego_lane.split('_')[-1])
+                    ego_road_id = ego_lane.split('_')[0]
+                    # if front_vehicle_road_id[:3] == ':J3' or ego_road_id[:3] == ':J3':
+                    #     print('debug')
+                    if front_vehicle_lane_index != ego_lane_index:
                         pass
                     else:
                         # 相对速度 - ego车的速度 - 前车的速度的差值
@@ -190,8 +197,15 @@ class VehEnvWrapper(gym.Wrapper):
                 back_vehicle = traci.vehicle.getFollower(vehicle_id)
                 if back_vehicle not in [None, ()] and back_vehicle[0] != '':  # 有可能是空的
                     back_vehicle_lane = traci.vehicle.getLaneID(back_vehicle[0])
+                    back_vehicle_lane_index = int(back_vehicle_lane.split('_')[-1])
+                    back_vehicle_road_id = back_vehicle_lane.split('_')[0]
+
                     ego_lane = state['vehicle'][vehicle_id]['lane_id']
-                    if back_vehicle_lane != ego_lane:
+                    ego_lane_index = int(ego_lane.split('_')[-1])
+                    ego_road_id = ego_lane.split('_')[0]
+
+                    if back_vehicle_lane_index != ego_lane_index:
+                    # if back_vehicle_lane != ego_lane:
                         pass
                     else:
                         if back_vehicle[0][:3] == 'HDV':
