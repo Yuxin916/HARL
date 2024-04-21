@@ -244,6 +244,7 @@ def make_render_env(env_name, seed, env_args):
         from harl.envs.bottleneck.bottleneck_env import BOTTLENECKEnv
 
         env = BOTTLENECKEnv(env_args)
+        manual_render = False  # football renders automatically
 
         env.seed(seed * 60000)
     else:
