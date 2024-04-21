@@ -1,6 +1,7 @@
 import copy
 import gym
 import sys
+import numpy as np
 from .env_utils.veh_env import VehEnvironment
 from .env_utils.veh_env_wrapper import VehEnvWrapper
 from tshub.utils.get_abs_path import get_abs_path
@@ -13,7 +14,7 @@ def make_bottleneck_envs():
 
     # base env
     sumo_cfg = path_convert("env_utils/bottleneck_map_small/scenario.sumocfg")
-    num_seconds = 1500  # 秒
+    num_seconds = 200  # 秒
     vehicle_action_type = 'lane_continuous_speed'
     use_gui = False
     trip_info = None
@@ -88,37 +89,49 @@ class BOTTLENECKEnv:
         """
         return local_obs, global_state, rewards, dones, infos, available_actions
         """
-        if self.discrete:
-            obs, rew, done, info = self.env.step(actions.flatten()[0])
-        else:
-            obs, rew, done, info = self.env.step(actions[0])
-        if done:
-            if (
-                "TimeLimit.truncated" in info.keys()
-                and info["TimeLimit.truncated"] == True
-            ):
-                info["bad_transition"] = True
-        return [obs], [obs], [[rew]], [done], [info], self.get_avail_actions()
+        action_dict = {ego_id: action[0] for ego_id, action in zip(self.env.ego_ids, actions)}
+        obs, rew, truncated, done, info = self.env.step(action_dict)
+
+        s_obs = self.convert_shared_obs(obs)
+        obs = list(obs.values())
+        s_obs = list(s_obs.values())
+        rew = np.array(list(rew.values())).reshape((-1, 1))
+        done = np.array(list(done.values()))
+
+        return obs, s_obs, rew, done, self.repeat(info), self.get_avail_actions()
 
     def reset(self):
         """Returns initial observations and states"""
-        obs = [self.env.reset()]
-        s_obs = copy.deepcopy(obs)
+        obs, _ = self.env.reset()
+        s_obs = self.convert_shared_obs(obs)
+        obs = list(obs.values())
+        s_obs = list(s_obs.values())
+
         return obs, s_obs, self.get_avail_actions()
 
     def seed(self, seed):
         pass
 
     def get_avail_actions(self):
-        if self.discrete:
-            avail_actions = [[1] * self.action_space[0].n]
-            return avail_actions
-        else:
-            return None
 
-    def render(self):
-        self.env.render()
+        avail_actions = [[1] * self.action_space[0].n]*self.n_agents
+        return np.array(avail_actions)
+        # TODO: 换道的动作被mask掉
 
     def close(self):
         self.env.close()
+
+    def convert_shared_obs(self, obs_dict):
+        # Concatenate all observations into one list
+        all_observations = []
+        for cav, observations in obs_dict.items():
+            all_observations.extend(observations)
+
+        # Create shared_obs with the same keys but with the concatenated list for each
+        shared_obs = {cav: all_observations for cav in obs_dict.keys()}
+
+        return shared_obs
+
+    def repeat(self, a):
+        return [a for _ in range(self.n_agents)]
 

@@ -13,6 +13,13 @@ from .wrapper_utils import (
     check_collisions_based_pos,
     check_collisions
 )
+from tshub.utils.get_abs_path import get_abs_path
+from tshub.utils.init_log import set_logger
+# 获得全局路径
+path_convert = get_abs_path(__file__)
+# 设置日志 -- tshub自带的给环境的
+set_logger(path_convert('./'), file_log_level="ERROR", terminal_log_level='ERROR')
+
 
 # TODO: 在MARL actor中可以考虑分开encode - 地图信息 - 单车信息 - 所有车的信息 （借鉴MAPPO对state的处理
 

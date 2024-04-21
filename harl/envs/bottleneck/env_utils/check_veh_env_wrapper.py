@@ -76,7 +76,7 @@ if __name__ == '__main__':
         delta_t=delta_t
     )
 
-    for constant_speed in range(3, 5):  # 测试不同的速度
+    for constant_speed in range(1, 5):  # 测试不同的速度
         """
         在simple中
         0： 不换道
@@ -101,7 +101,7 @@ if __name__ == '__main__':
             logger.info(f'SIM: Info: {infos}')
             logger.info(f'SIM: Warn Vehicle: {ac_env_wrapper.warn_ego_ids}')
             logger.info(f'SIM: Collision Vehicle: {ac_env_wrapper.coll_ego_ids}')
-            time.sleep(0.2)
+            time.sleep(10)
             if done:
                 print('done')
 
