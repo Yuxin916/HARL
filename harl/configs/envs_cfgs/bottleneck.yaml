@@ -1,1 +1,40 @@
 scenario: small
+
+sumo_cfg: "env_utils/bottleneck_map_small/scenario.sumocfg"
+max_num_seconds: 200
+vehicle_action_type: "lane_continuous_speed"
+use_gui: False
+
+# for veh wrapper
+scene_name: "Env_Bottleneck"
+num_CAVs: 9  # num_CAVs/penetration_CAV should be an integer multiple of 10, except for penetration_CAV=1
+penetration_CAV: 0.9 # only 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1 are valid
+warmup_steps: 0
+ego_ids: [ 'CAV_0', 'CAV_1', 'CAV_2',
+           'CAV_3',
+           'CAV_4',
+           'CAV_5', 'CAV_6', 'CAV_7',
+           'CAV_8',
+  # 'CAV_9',
+] # the number of ids should be equal to num_CAVs
+edge_ids: [ 'E0', 'E1', 'E2', 'E3', 'E4', ]
+edge_lane_num: { 'E0': 4,
+                 'E1': 4,
+                 'E2': 4,
+                 'E3': 2,
+                 'E4': 4,
+}  # 每一个 edge 对应的车道数
+bottle_necks: [ 'E4' ]  # bottleneck 的 edge id
+bottle_neck_positions: [496, 0]  # bottle neck 的坐标, 用于计算距离
+calc_features_lane_ids: [ 'E0_0', 'E0_1',
+                          'E0_2', 'E0_3',
+                          'E1_0', 'E1_1',
+                          'E1_2', 'E1_3',
+                          'E2_0', 'E2_1',
+                          'E2_2', 'E2_3',
+                          'E3_0', 'E3_1',
+                          'E4_0', 'E4_1',
+                          'E4_2', 'E4_3',
+]  # 计算对应的 lane 的信息
+log_path: './log/check_veh_env'
+delta_t: 1.0
