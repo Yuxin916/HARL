@@ -22,15 +22,15 @@ def make_bottleneck_envs():
     # for veh wrapper
     scene_name = "Env_Bottleneck"
     num_HDVs = 0
-    num_CAVs = 4
-    penetration_CAV = 1
+    num_CAVs = 4  # num_CAVs/penetration_CAV should be an integer multiple of 10, except for penetration_CAV=1
+    penetration_CAV = 1  # only 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1 are valid
     warmup_steps = 0
     ego_ids = ['CAV_0', 'CAV_1', 'CAV_2',
                'CAV_3',
                # 'CAV_4',
                # 'CAV_5', 'CAV_6', 'CAV_7',
                # 'CAV_8', 'CAV_9',
-               ]
+               ]  # the number of ids should be equal to num_CAVs
     edge_ids = ['E0', 'E1', 'E2', 'E3', 'E4', ]
     edge_lane_num = {'E0': 4,
                      'E1': 4,

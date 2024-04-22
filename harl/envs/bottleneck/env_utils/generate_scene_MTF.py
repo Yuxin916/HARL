@@ -10,7 +10,7 @@ def generate_scenario(use_gui: bool, sce_name: str, CAV_num: int, CAV_penetratio
     use_gui: false for libsumo, true for traci
     sce_name: scenario name, e.g., "Env_Bottleneck"
     CAV_num: number of CAVs
-    CAV_penetration: CAV penetration rate
+    CAV_penetration: CAV penetration rate, only 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0 can be used
     - the number of vehicles in the scenario is determined by veh_num=CAV_num/CAV_penetration
     - the number of HDVs is determined by HDV_num=veh_num-CAV_num
     - 3 types of HDVs are randomly generated, and the parameters of each type of HDVs are defined in .rou.xml
@@ -69,15 +69,17 @@ def generate_scenario(use_gui: bool, sce_name: str, CAV_num: int, CAV_penetratio
     else:
         i_CAV = 0
         i_HDV = 0
-        veh_distribution = [random.random() for _ in range(veh_num)]
         for i_all in range(veh_num):
-            if veh_distribution[i_all] < CAV_penetration:
+            pos_change = -5 if i_all % 4 == 1 else 5
+            pos_change = 10 if i_all % 4 == 2 else pos_change
+            pos_change = 0 if i_all % 4 == 0 else pos_change
+            if i_all % 10 < int(CAV_penetration*10):
                 scene_change.add(
                     vehID=f'CAV_{i_CAV}',
                     typeID='ego',
                     routeID=f'route_{int(random_route_CAVs[i_CAV])}',
                     depart="now",
-                    departPos=f'{float(250 - i_all / 4 * 20)}',
+                    departPos=f'{float(250 - i_all / 4 * 20 + pos_change)}',
                     departLane=f'{int(i_all % 4)}',
                     departSpeed='10',
                 )
@@ -88,7 +90,7 @@ def generate_scenario(use_gui: bool, sce_name: str, CAV_num: int, CAV_penetratio
                     typeID=f'HDV_{int(random_HDVs[i_HDV])}',
                     routeID=f'route_{int(random_route_HDVs[i_HDV])}',
                     depart="now",
-                    departPos=f'{float(250 - i_all / 4 * 20)}',
+                    departPos=f'{float(250 - i_all / 4 * 20 + pos_change)}',
                     departLane=f'{int(i_all % 4)}',
                     departSpeed='10',
                 )
