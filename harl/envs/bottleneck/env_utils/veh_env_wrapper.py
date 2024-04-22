@@ -7,10 +7,11 @@ from gymnasium.core import Env
 from loguru import logger
 
 # from .generate_scene import generate_scenario
-from generate_scene_MTF import generate_scenario
-from wrapper_utils import (
+from .generate_scene_MTF import generate_scenario
+from .wrapper_utils import (
     analyze_traffic,
     compute_ego_vehicle_features,
+    compute_centralized_vehicle_features,
     check_collisions_based_pos,
     check_collisions
 )
@@ -20,7 +21,6 @@ from tshub.utils.init_log import set_logger
 path_convert = get_abs_path(__file__)
 # 设置日志 -- tshub自带的给环境的
 set_logger(path_convert('./'), file_log_level="ERROR", terminal_log_level='ERROR')
-
 
 # TODO: 在MARL actor中可以考虑分开encode - 地图信息 - 单车信息 - 所有车的信息 （借鉴MAPPO对state的处理
 
@@ -34,6 +34,10 @@ set_logger(path_convert('./'), file_log_level="ERROR", terminal_log_level='ERROR
 # TODO: 在E3全速前进 - rule based
 
 # TODO: reward design is related to the CAV penetration rate, if the CAV penetration rate is higher, the weight of the global reward is higher???
+
+GAP_THRESHOLD = 1.5
+WARN_GAP_THRESHOLD = 3.0
+
 
 class VehEnvWrapper(gym.Wrapper):
     """Vehicle Env Wrapper for vehicle info
@@ -110,14 +114,14 @@ class VehEnvWrapper(gym.Wrapper):
     @property
     def observation_space(self):
         obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(214,)  #TODO 太多了！
+            low=-np.inf, high=np.inf, shape=(40,)
         )
         return {_ego_id: obs_space for _ego_id in self.ego_ids}
 
     @property
     def share_observation_space(self):
         share_obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(214*self.num_CAVs,)  # TODO 太多了！
+            low=-np.inf, high=np.inf, shape=(132,)
         )
         return {_ego_id: share_obs_space for _ego_id in self.ego_ids}
 
@@ -308,8 +312,11 @@ class VehEnvWrapper(gym.Wrapper):
             bottle_neck_positions=self.bottle_neck_positions,
 
         )
+        shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
+                                                                      feature_vectors,
+                                                                      self.bottle_neck_positions)
 
-        return feature_vectors, lane_statistics, ego_statistics, reward_statistics
+        return feature_vectors, shared_feature_vectors, lane_statistics, ego_statistics, reward_statistics
 
     def reward_wrapper(self, lane_statistics, ego_statistics, reward_statistics) -> float:
         """
@@ -360,7 +367,9 @@ class VehEnvWrapper(gym.Wrapper):
         range_reward_ego = {key: 0 for key in list(set(self.ego_ids) - set(self.out_of_road))}
 
         all_vehicle_speed = []
+        all_ego_vehicle_speed = []
         all_vehicle_accumulated_waiting_time = []
+        all_ego_vehicle_accumulated_waiting_time = []
 
         for veh_id, (veh_travel_time, road_id, distance, speed, position_x,
                      position_y, waiting_time, accumulated_waiting_time) in list(self.vehicles_info.items()):
@@ -372,12 +381,15 @@ class VehEnvWrapper(gym.Wrapper):
             if veh_id in self.ego_ids:
                 # 计算CAV车辆的累积平均速度
                 ego_mean_speed = distance / veh_travel_time  # TODO: 这个和target speed
+                all_ego_vehicle_speed.append(ego_mean_speed)
+
                 # CAV车辆的速度越靠近最大速度，reward越高 - [0, 5]
                 individual_speed_r = -abs(ego_mean_speed - max_speed) / max_speed * 5 + 5
                 inidividual_rew_ego[veh_id] += individual_speed_r
 
                 # 计算CAV车辆的累积平均等待时间
                 ego_mean_waiting_time = accumulated_waiting_time
+                all_ego_vehicle_accumulated_waiting_time.append(ego_mean_waiting_time)
                 # CAV车辆的等待时间越短，reward越高 - [0, 5]
                 individual_waiting_time_r = -ego_mean_waiting_time / 50 * 5 + 5
                 inidividual_rew_ego[veh_id] += individual_waiting_time_r
@@ -386,20 +398,20 @@ class VehEnvWrapper(gym.Wrapper):
                 if veh_id in self.warn_ego_ids.keys():
                     individual_warn_r = 0
                     for dis in self.warn_ego_ids[veh_id]:
-                        individual_warn_r += -(5 - dis) / (5 - 1.5) * 10
+                        individual_warn_r += -(WARN_GAP_THRESHOLD - dis) / (WARN_GAP_THRESHOLD - GAP_THRESHOLD) * 10
                     inidividual_rew_ego[veh_id] += individual_warn_r
 
                 if veh_id in self.coll_ego_ids.keys():
                     individual_coll_r = 0
                     for dis in self.coll_ego_ids[veh_id]:
-                        individual_coll_r += -(1.5 - dis) / 1.5 * 500 - 5
+                        individual_coll_r += -(GAP_THRESHOLD - dis) / GAP_THRESHOLD * 500 - 5
                     inidividual_rew_ego[veh_id] += individual_coll_r
 
                 else:
                     inidividual_rew_ego[veh_id] += 0
 
                 # 计算局部地区的reward
-                if road_id in self.bottle_necks+['E3']:
+                if road_id in self.bottle_necks + ['E3']:
                     # 快速穿过bottleneck区域 和最后一个lane
                     individual_botte_neck_r = -abs(speed - max_speed) / max_speed * 5 + 5
                     range_reward_ego[veh_id] = individual_botte_neck_r
@@ -408,14 +420,23 @@ class VehEnvWrapper(gym.Wrapper):
 
         # 计算全局reward
         all_mean_speed = np.mean(all_vehicle_speed)
+        all_ego_mean_speed = np.mean(all_ego_vehicle_speed)
         all_mean_accumulated_waiting_time = np.mean(all_vehicle_accumulated_waiting_time)
-        global_speed_r = -abs(all_mean_speed - max_speed) / max_speed * 5 + 5
-        global_waiting_time_r = -all_mean_accumulated_waiting_time / 50 * 5 + 5
+        all_ego_vehicle_accumulated_waiting_time = np.mean(all_ego_vehicle_accumulated_waiting_time)
 
-        # TODO： lane_statistics
-        # TODO: 在E2的等待时间
-        rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + global_speed_r + global_waiting_time_r for
-                   key in inidividual_rew_ego}
+        global_speed_r = -abs(all_mean_speed - max_speed) / max_speed * 5 + 5
+        global_ego_speed_r = -abs(all_ego_mean_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
+        global_waiting_time_r = -all_mean_accumulated_waiting_time / 10
+        global_ego_waiting_time_r = -all_ego_vehicle_accumulated_waiting_time / 10  # [0, 5]
+
+        # TODO： lane_statistics  在E2的等待时间
+        # rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + global_speed_r + global_waiting_time_r for
+        #            key in inidividual_rew_ego}
+        # rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + global_speed_r + global_waiting_time_r + \
+        #               global_ego_speed_r + global_ego_waiting_time_r for key in inidividual_rew_ego}
+
+        rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + \
+                        global_ego_speed_r + global_ego_waiting_time_r for key in inidividual_rew_ego}
 
         return rewards
 
@@ -427,15 +448,16 @@ class VehEnvWrapper(gym.Wrapper):
 
         ################# 碰撞检查 ###########################################
         # 简单版本 - 根据车头的两两位置计算是否碰撞
-        collisions_head_vehs, collisions_head_info = check_collisions_based_pos(init_state['vehicle'], gap_threshold=2)
+        collisions_head_vehs, collisions_head_info = check_collisions_based_pos(init_state['vehicle'],
+                                                                                gap_threshold=GAP_THRESHOLD)
 
         # print('point to point collision:', collisions_head_vehs, collisions_head_info)
 
         # 稍微复杂的版本 - 根据neighbour位置计算是否碰撞
         collisions_neigh_vehs, warn_neigh_vehs, collisions_neigh_info = check_collisions(init_state['vehicle'],
                                                                                          self.ego_ids,
-                                                                                         gap_threshold=1.5,
-                                                                                         gap_warn_collision=3.0
+                                                                                         gap_threshold=GAP_THRESHOLD,
+                                                                                         gap_warn_collision=WARN_GAP_THRESHOLD
                                                                                          # 给reward的警告距离
                                                                                          )
         # print('neighbour collision:', collisions_neigh_vehs, collisions__neigh_info)
@@ -504,17 +526,17 @@ class VehEnvWrapper(gym.Wrapper):
             # 检查是否有碰撞
             collisions_vehs, warn_vehs, collision_infos = check_collisions(init_state['vehicle'],
                                                                            self.ego_ids,
-                                                                           gap_threshold=1.5,
-                                                                           gap_warn_collision=3.2)
+                                                                           gap_threshold=GAP_THRESHOLD,
+                                                                           gap_warn_collision=WARN_GAP_THRESHOLD)
             # reset 时不应该有碰撞
             assert len(collisions_vehs) == 0, f'Collision with {collisions_vehs} at reset!!! Regenerate the flow'
             assert len(warn_vehs) == 0, f'Warning with {warn_vehs} at reset!!! Regenerate the flow'
 
             # 对 state 进行处理
-            feature_vectors, _, _, _ = self.state_wrapper(state=init_state)
+            feature_vectors, shared_feature_vectors, _, _, _ = self.state_wrapper(state=init_state)
             self.__init_actions(raw_state=init_state)
 
-        return feature_vectors, {'step_time': self.warmup_steps}
+        return feature_vectors, shared_feature_vectors, {'step_time': self.warmup_steps}
 
     def step(self, action: Dict[str, int]) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         """
@@ -537,8 +559,9 @@ class VehEnvWrapper(gym.Wrapper):
         ####################################################################
 
         # 对 state 进行处理 (feature_vectors的长度是没有行驶出CAV的数量)
-        feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
+        feature_vectors, shared_feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
 
+        # 处理离开路网的车辆 agent_mask 和 out_of_road
         for _ego_id in self.ego_ids:
             if _ego_id not in feature_vectors:
                 assert _ego_id not in ego_statistics, f'ego vehicle {_ego_id} should not be in ego_statistics'
@@ -547,6 +570,7 @@ class VehEnvWrapper(gym.Wrapper):
                 if _ego_id not in self.out_of_road:
                     self.out_of_road.append(_ego_id)
 
+        # 初始化车辆的速度
         self.__init_actions(raw_state=init_state)
 
         # 处理 dones 和 infos
@@ -569,7 +593,7 @@ class VehEnvWrapper(gym.Wrapper):
             while self.vehicles_info:  # 仿真到没有车在 self.edge_ids
                 init_state, _, _, _, _ = super().step(self.actions)
                 init_state = self.append_surrounding(init_state)
-                feature_vectors, _, _, reward_statistics = self.state_wrapper(state=init_state)
+                feature_vectors, shared_feature_vectors, _, _, reward_statistics = self.state_wrapper(state=init_state)
                 reward = self.reward_wrapper(lane_statistics, ego_statistics, reward_statistics)  # 更新 veh info
                 self.__init_actions(raw_state=init_state)
                 if not rewards:
@@ -584,7 +608,7 @@ class VehEnvWrapper(gym.Wrapper):
                 rewards[out_of_road_ego_id] = 0.0  # 离开路网之后 reward 也是 0  # TODO: 注意一下dead mask MARL
                 infos['out_of_road'].append(out_of_road_ego_id)
                 self.agent_mask[out_of_road_ego_id] = False
-                feature_vectors[out_of_road_ego_id] = [0.0] * 214
+                feature_vectors[out_of_road_ego_id] = [0.0] * 40
                 pass
 
         # 处理以下 infos
@@ -626,7 +650,7 @@ class VehEnvWrapper(gym.Wrapper):
         # if all([dones[_ego_id] for _ego_id in self.ego_ids]):
         #     print('stop here')
 
-        return feature_vectors, rewards, dones.copy(), dones.copy(), infos
+        return feature_vectors, shared_feature_vectors, rewards, dones.copy(), dones.copy(), infos
 
     def close(self) -> None:
         return super().close()

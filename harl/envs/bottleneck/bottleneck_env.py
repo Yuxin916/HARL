@@ -16,19 +16,19 @@ def make_bottleneck_envs():
     sumo_cfg = path_convert("env_utils/bottleneck_map_small/scenario.sumocfg")
     num_seconds = 200  # 秒
     vehicle_action_type = 'lane_continuous_speed'
-    use_gui = False
+    use_gui = True
     trip_info = None
 
     # for veh wrapper
     scene_name = "Env_Bottleneck"
     num_HDVs = 0
-    num_CAVs = 3
+    num_CAVs = 10
     penetration_CAV = 1
     warmup_steps = 0
     ego_ids = ['CAV_0', 'CAV_1', 'CAV_2',
-               # 'CAV_3', 'CAV_4',
-               # 'CAV_5', 'CAV_6', 'CAV_7',
-               # 'CAV_8', 'CAV_9',
+               'CAV_3', 'CAV_4',
+               'CAV_5', 'CAV_6', 'CAV_7',
+               'CAV_8', 'CAV_9',
                ]
     edge_ids = ['E0', 'E1', 'E2', 'E3', 'E4', ]
     edge_lane_num = {'E0': 4,
@@ -92,9 +92,9 @@ class BOTTLENECKEnv:
         return local_obs, global_state, rewards, dones, infos, available_actions
         """
         action_dict = {ego_id: action[0] for ego_id, action in zip(self.env.ego_ids, actions)}
-        obs, rew, truncated, done, info = self.env.step(action_dict)
+        obs, s_obs, rew, truncated, done, info = self.env.step(action_dict)
 
-        s_obs = self.convert_shared_obs(obs)
+        # s_obs = self.convert_shared_obs(obs)
         obs = list(obs.values())
         s_obs = list(s_obs.values())
         rew = np.array(list(rew.values())).reshape((-1, 1))
@@ -104,8 +104,8 @@ class BOTTLENECKEnv:
 
     def reset(self):
         """Returns initial observations and states"""
-        obs, _ = self.env.reset()
-        s_obs = self.convert_shared_obs(obs)
+        obs, s_obs, _ = self.env.reset()
+        # s_obs = self.convert_shared_obs(obs)
         obs = list(obs.values())
         s_obs = list(s_obs.values())
 

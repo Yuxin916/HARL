@@ -340,7 +340,7 @@ def compute_ego_vehicle_features(
         normalized_heading = heading / 360
 
         # One-hot encode road_id - 5
-        edge_id_one_hot = one_hot_encode(road_id, unique_edges)
+        road_id_one_hot = one_hot_encode(road_id, unique_edges)
 
         # One-hot encode lane_index - 4
         lane_index_one_hot = one_hot_encode(lane_index, list(range(edge_lane_num.get(road_id, 0))))
@@ -348,6 +348,7 @@ def compute_ego_vehicle_features(
         if len(lane_index_one_hot) < 4:
             lane_index_one_hot += [0] * (4 - len(lane_index_one_hot))
 
+        # ############################## 周车信息 ##############################
         # 提取surrounding的信息 -18
         surround = []
         for index, (_, statistics) in enumerate(surroundings.items()):
@@ -358,21 +359,19 @@ def compute_ego_vehicle_features(
         if len(flat_surround) < 18:
             flat_surround += [0] * (18 - len(flat_surround))
 
-        # ############################## lane_statistics 的信息 ##############################
-        # Initialize a list to hold all lane statistics
-        all_lane_stats = []
+        # ############################## 当前车道信息 ##############################
+        # ego_id当前所在的lane
+        ego_lane_id = f'{road_id}_{lane_index}'
+        # 每个obs只需要一个lane的信息，不需要所有lane的信息， shared obs可以拿到所有lane的信息
+        ego_lane_stats = lane_statistics[ego_lane_id]
 
-        # Iterate over all possible lanes to get their statistics
-        for _, lane_info in lane_statistics.items():
-            # 前三个 -
-            # - vehicle_count: 当前车道的车辆数 1
-            # - lane_density: 当前车道的车辆密度 1
-            # - lane_length: 这个车道的长度 1
-            # - speeds: 在这个车道上车的速度 3 (mean, max, min)
-            # - waiting_times: 一旦车辆开始行驶，等待时间清零 3  (mean, max, min)
-            # - accumulated_waiting_times: 车的累积等待时间 3 (mean, max, min)
-
-            all_lane_stats += [_i for _i in lane_info]
+        # - vehicle_count: 当前车道的车辆数 1
+        # - lane_density: 当前车道的车辆密度 1
+        # - lane_length: 这个车道的长度 1
+        # - speeds: 在这个车道上车的速度 1 (mean)
+        # - waiting_times: 一旦车辆开始行驶，等待时间清零 1  (mean)
+        # - accumulated_waiting_times: 车的累积等待时间 1 (mean, max)
+        ego_lane_stats = ego_lane_stats[:4] + ego_lane_stats[6:7] + ego_lane_stats[9:10]
 
         # ############################## bottle_neck 的信息 ##############################
         # 车辆距离bottle_neck
@@ -383,14 +382,52 @@ def compute_ego_vehicle_features(
         normalized_distance = distance / 700
 
         # ############################## 合并所有 ##############################
+        # feature_vector = [normalized_speed, normalized_position_x, normalized_position_y, normalized_heading,
+        #                   bottle_neck_position_x, bottle_neck_position_y, normalized_distance] + \
+        #                   road_id_one_hot + lane_index_one_hot + flat_surround + all_lane_stats
+
         feature_vector = [normalized_speed, normalized_position_x, normalized_position_y, normalized_heading,
                           bottle_neck_position_x, bottle_neck_position_y, normalized_distance] + \
-                          edge_id_one_hot + lane_index_one_hot + flat_surround + all_lane_stats
+                          road_id_one_hot + lane_index_one_hot + flat_surround + ego_lane_stats
+
 
         # Assign the feature vector to the corresponding ego vehicle
         feature_vectors[ego_id] = [float(item) for item in feature_vector]
 
     # 保证每一个 ego vehicle 的特征长度一致
-    assert all(len(feature_vector) == 214 for feature_vector in feature_vectors.values())
+    assert all(len(feature_vector) == 40 for feature_vector in feature_vectors.values())
 
     return feature_vectors
+
+def compute_centralized_vehicle_features(lane_statistics, feature_vectors, bottle_neck_positions):
+    shared_features = {}
+
+    # ############################## 所有车的速度 位置 转向信息 ##############################
+    all_vehicle = []
+    for _, ego_feature in feature_vectors.items():
+        all_vehicle += ego_feature[:4]
+
+    # ############################## lane_statistics 的信息 ##############################
+    # Initialize a list to hold all lane statistics
+    all_lane_stats = []
+
+    # Iterate over all possible lanes to get their statistics
+    for _, lane_info in lane_statistics.items():
+        # - vehicle_count: 当前车道的车辆数 1
+        # - lane_density: 当前车道的车辆密度 1
+        # - lane_length: 这个车道的长度 1
+        # - speeds: 在这个车道上车的速度 1 (mean)
+        # - waiting_times: 一旦车辆开始行驶，等待时间清零 1  (mean)
+        # - accumulated_waiting_times: 车的累积等待时间 1 (mean, max)
+
+        all_lane_stats += lane_info[:4] + lane_info[6:7] + lane_info[9:10]
+
+    # ############################## bottleneck 的信息 ##############################
+    # 车辆距离bottle_neck
+    bottle_neck_position_x = bottle_neck_positions[0] / 700
+    bottle_neck_position_y = bottle_neck_positions[1]
+
+    for ego_id in feature_vectors.keys():
+        shared_features[ego_id] = [bottle_neck_position_x, bottle_neck_position_y] + all_vehicle + all_lane_stats
+
+    return shared_features

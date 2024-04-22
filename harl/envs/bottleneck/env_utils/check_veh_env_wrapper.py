@@ -94,7 +94,7 @@ if __name__ == '__main__':
             # 获取环境中所有车辆的ID
             # 为每个车辆生成一个动作
             action = {ego_id: constant_speed for ego_id in ac_env_wrapper.ego_ids}
-            states, rewards, truncated, dones, infos = ac_env_wrapper.step(action=action)
+            states, shared_state, rewards, truncated, dones, infos = ac_env_wrapper.step(action=action)
             done = all([dones[_ego_id] for _ego_id in ac_env_wrapper.ego_ids])
             logger.info(f'SIM: Applied action: {ac_env_wrapper.action_command}')
             logger.info(f'SIM: Speed: {ac_env_wrapper.current_speed}')
