@@ -46,7 +46,8 @@ def make_bottleneck_envs():
                               'E2_0', 'E2_1',
                               'E2_2', 'E2_3',
                               'E3_0', 'E3_1',
-                              'E4'
+                              'E4_0', 'E4_1',
+                              'E4_2', 'E4_3',
                               ]  # 计算对应的 lane 的信息
     log_path = path_convert('./log/check_veh_env')
     delta_t = 1.0
