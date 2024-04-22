@@ -9,49 +9,28 @@ from tshub.utils.get_abs_path import get_abs_path
 # 获得全局路径
 path_convert = get_abs_path(__file__)
 
-def make_bottleneck_envs():
-    # TODO: temp write the arguments fixed
+def make_bottleneck_envs(args):
 
     # base env
-    sumo_cfg = path_convert("env_utils/bottleneck_map_small/scenario.sumocfg")
-    num_seconds = 200  # 秒
-    vehicle_action_type = 'lane_continuous_speed'
-    use_gui = False
+    sumo_cfg = path_convert(args['sumo_cfg'])
+    num_seconds = args['max_num_seconds']  # 秒
+    vehicle_action_type = args['vehicle_action_type']
+    use_gui = args['use_gui']
     trip_info = None
 
     # for veh wrapper
-    scene_name = "Env_Bottleneck"
-    num_HDVs = 0
-    num_CAVs = 4  # num_CAVs/penetration_CAV should be an integer multiple of 10, except for penetration_CAV=1
-    penetration_CAV = 1  # only 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1 are valid
-    warmup_steps = 0
-    ego_ids = ['CAV_0', 'CAV_1', 'CAV_2',
-               'CAV_3',
-               # 'CAV_4',
-               # 'CAV_5', 'CAV_6', 'CAV_7',
-               # 'CAV_8', 'CAV_9',
-               ]  # the number of ids should be equal to num_CAVs
-    edge_ids = ['E0', 'E1', 'E2', 'E3', 'E4', ]
-    edge_lane_num = {'E0': 4,
-                     'E1': 4,
-                     'E2': 4,
-                     'E3': 2,
-                     'E4': 4,
-                     }  # 每一个 edge 对应的车道数
-    bottle_necks = ['E4']  # bottleneck 的 edge id
-    bottle_neck_positions = (496, 0)  # bottle neck 的坐标, 用于计算距离
-    calc_features_lane_ids = ['E0_0', 'E0_1',
-                              'E0_2', 'E0_3',
-                              'E1_0', 'E1_1',
-                              'E1_2', 'E1_3',
-                              'E2_0', 'E2_1',
-                              'E2_2', 'E2_3',
-                              'E3_0', 'E3_1',
-                              'E4_0', 'E4_1',
-                              'E4_2', 'E4_3',
-                              ]  # 计算对应的 lane 的信息
-    log_path = path_convert('./log/check_veh_env')
-    delta_t = 1.0
+    scene_name = args['scene_name']
+    num_CAVs = args['num_CAVs']
+    penetration_CAV = args['penetration_CAV']
+    warmup_steps = args['warmup_steps']
+    ego_ids = args['ego_ids']
+    edge_ids = args['edge_ids']
+    edge_lane_num = args['edge_lane_num']
+    bottle_necks = args['bottle_necks']
+    bottle_neck_positions = args['bottle_neck_positions']
+    calc_features_lane_ids = args['calc_features_lane_ids']
+    log_path = path_convert(args['log_path'])
+    delta_t = args['delta_t']
 
     veh_env = VehEnvironment(
         sumo_cfg=sumo_cfg,
@@ -63,7 +42,6 @@ def make_bottleneck_envs():
     veh_env = VehEnvWrapper(
         env=veh_env,
         name_scenario=scene_name,
-        num_HDVs=num_HDVs,
         num_CAVs=num_CAVs,
         CAV_penetration=penetration_CAV,
         warmup_steps=warmup_steps,
@@ -83,7 +61,7 @@ def make_bottleneck_envs():
 class BOTTLENECKEnv:
     def __init__(self, args):
         self.args = copy.deepcopy(args)
-        self.env = make_bottleneck_envs()
+        self.env = make_bottleneck_envs(self.args)
         self.n_agents = self.env.num_CAVs
         self.share_observation_space = list(self.env.share_observation_space.values())
         self.observation_space = list(self.env.observation_space.values())
