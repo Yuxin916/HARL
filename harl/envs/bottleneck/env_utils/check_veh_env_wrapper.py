@@ -23,11 +23,12 @@ if __name__ == '__main__':
     # for veh wrapper
     scene_name = "Env_Bottleneck"
     penetration_CAV = 1
-    num_CAVs = 3
+    num_CAVs = 4
     num_HDVs = 10
     warmup_steps = 0
     ego_ids = ['CAV_0', 'CAV_1', 'CAV_2',
-               # 'CAV_3', 'CAV_4',
+               'CAV_3',
+               # 'CAV_4',
                # 'CAV_5', 'CAV_6', 'CAV_7',
                # 'CAV_8', 'CAV_9',
                ]

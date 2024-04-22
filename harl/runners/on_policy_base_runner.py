@@ -651,7 +651,7 @@ class OnPolicyBaseRunner:
                         self.envs.render()
                     if self.manual_delay:
                         time.sleep(0.1)
-                    if eval_dones[0]:
+                    if np.all(eval_dones):
                         print(f"total reward of this episode: {rewards}")
                         break
         else:

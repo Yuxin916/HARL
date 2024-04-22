@@ -16,19 +16,20 @@ def make_bottleneck_envs():
     sumo_cfg = path_convert("env_utils/bottleneck_map_small/scenario.sumocfg")
     num_seconds = 200  # 秒
     vehicle_action_type = 'lane_continuous_speed'
-    use_gui = True
+    use_gui = False
     trip_info = None
 
     # for veh wrapper
     scene_name = "Env_Bottleneck"
     num_HDVs = 0
-    num_CAVs = 10
+    num_CAVs = 4
     penetration_CAV = 1
     warmup_steps = 0
     ego_ids = ['CAV_0', 'CAV_1', 'CAV_2',
-               'CAV_3', 'CAV_4',
-               'CAV_5', 'CAV_6', 'CAV_7',
-               'CAV_8', 'CAV_9',
+               'CAV_3',
+               # 'CAV_4',
+               # 'CAV_5', 'CAV_6', 'CAV_7',
+               # 'CAV_8', 'CAV_9',
                ]
     edge_ids = ['E0', 'E1', 'E2', 'E3', 'E4', ]
     edge_lane_num = {'E0': 4,

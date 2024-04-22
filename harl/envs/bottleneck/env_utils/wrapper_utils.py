@@ -33,8 +33,6 @@ def analyze_traffic(state, lane_ids):
         - lane_index: vehicle当前所在车道的 index
         - surroundings: vehicle周围车辆的相对位置
 
-        # TODO: all lane length?
-
     3. reward_statistics: Dict, key: vehicle_id, value:
         - 这个车行驶道路的 ID. eg: 'E0'
         - 累积行驶距离
@@ -429,5 +427,9 @@ def compute_centralized_vehicle_features(lane_statistics, feature_vectors, bottl
 
     for ego_id in feature_vectors.keys():
         shared_features[ego_id] = [bottle_neck_position_x, bottle_neck_position_y] + all_vehicle + all_lane_stats
+
+    # if not all(len(shared_feature) == 126 for shared_feature in shared_features.values()):
+    #     print('shared_features:', shared_features)
+    assert all(len(shared_feature) == 126 for shared_feature in shared_features.values())
 
     return shared_features

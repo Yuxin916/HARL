@@ -121,7 +121,7 @@ class VehEnvWrapper(gym.Wrapper):
     @property
     def share_observation_space(self):
         share_obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(132,)
+            low=-np.inf, high=np.inf, shape=(126,)
         )
         return {_ego_id: share_obs_space for _ego_id in self.ego_ids}
 
@@ -312,11 +312,8 @@ class VehEnvWrapper(gym.Wrapper):
             bottle_neck_positions=self.bottle_neck_positions,
 
         )
-        shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
-                                                                      feature_vectors,
-                                                                      self.bottle_neck_positions)
 
-        return feature_vectors, shared_feature_vectors, lane_statistics, ego_statistics, reward_statistics
+        return feature_vectors, lane_statistics, ego_statistics, reward_statistics
 
     def reward_wrapper(self, lane_statistics, ego_statistics, reward_statistics) -> float:
         """
@@ -362,53 +359,62 @@ class VehEnvWrapper(gym.Wrapper):
                 if veh_id in self.vehicles_info:
                     del self.vehicles_info[veh_id]
 
-        # 开始计算reward
+        # ######################### 开始计算reward  # #########################
         inidividual_rew_ego = {key: 0 for key in list(set(self.ego_ids) - set(self.out_of_road))}
         range_reward_ego = {key: 0 for key in list(set(self.ego_ids) - set(self.out_of_road))}
 
-        all_vehicle_speed = []
-        all_ego_vehicle_speed = []
-        all_vehicle_accumulated_waiting_time = []
-        all_ego_vehicle_accumulated_waiting_time = []
+        # ######################## 初始化 for group reward ########################
+        all_ego_vehicle_speed = []  # CAV车辆的平均速度 - 使用target speed
+        all_ego_vehicle_mean_speed = []  # CAV车辆的累积平均速度 - 使用速度/时间
+        all_ego_vehicle_accumulated_waiting_time = []  # # CAV车辆的累积平均等待时间
+
+        all_vehicle_speed = []  # CAV和HDV车辆的平均速度 - 使用target speed
+        all_vehicle_mean_speed = []  # CAV和HDV车辆的累积平均速度 - 使用速度/时间
+        all_vehicle_accumulated_waiting_time = []  # CAV和HDV车辆的累积平均等待时间
 
         for veh_id, (veh_travel_time, road_id, distance, speed, position_x,
                      position_y, waiting_time, accumulated_waiting_time) in list(self.vehicles_info.items()):
 
-            all_vehicle_speed.append(distance / veh_travel_time)
+            # CAV和HDV车辆的
+            all_vehicle_speed.append(speed)
+            all_vehicle_mean_speed.append(distance / veh_travel_time)
             all_vehicle_accumulated_waiting_time.append(accumulated_waiting_time)
 
             # 把CAV单独取出来
             if veh_id in self.ego_ids:
-                # 计算CAV车辆的累积平均速度
-                ego_mean_speed = distance / veh_travel_time  # TODO: 这个和target speed
-                all_ego_vehicle_speed.append(ego_mean_speed)
 
-                # CAV车辆的速度越靠近最大速度，reward越高 - [0, 5]
-                individual_speed_r = -abs(ego_mean_speed - max_speed) / max_speed * 5 + 5
+                # for group reward 计算CAV车辆的累积平均速度
+                all_ego_vehicle_speed.append(speed)
+                all_ego_vehicle_mean_speed.append(distance / veh_travel_time)
+                all_ego_vehicle_accumulated_waiting_time.append(accumulated_waiting_time)
+
+                # ######################## for individual reward ########################
+                # CAV车辆的累积平均速度越靠近最大速度，reward越高 - [0, 5]
+                individual_speed_r = -abs(distance / veh_travel_time - max_speed) / max_speed * 5 + 5
                 inidividual_rew_ego[veh_id] += individual_speed_r
 
-                # 计算CAV车辆的累积平均等待时间
-                ego_mean_waiting_time = accumulated_waiting_time
-                all_ego_vehicle_accumulated_waiting_time.append(ego_mean_waiting_time)
+                # CAV车辆的target速度越靠近最大速度，reward越高 - [0, 5]
+                individual_speed_r_simple = -abs(speed - max_speed) / max_speed * 5 + 5
+                inidividual_rew_ego[veh_id] += individual_speed_r_simple
+
                 # CAV车辆的等待时间越短，reward越高 - [0, 5]
-                individual_waiting_time_r = -ego_mean_waiting_time / 50 * 5 + 5
+                individual_waiting_time_r = -accumulated_waiting_time / 10
                 inidividual_rew_ego[veh_id] += individual_waiting_time_r
 
                 # 警告距离和碰撞距离
                 if veh_id in self.warn_ego_ids.keys():
                     individual_warn_r = 0
                     for dis in self.warn_ego_ids[veh_id]:
-                        individual_warn_r += -(WARN_GAP_THRESHOLD - dis) / (WARN_GAP_THRESHOLD - GAP_THRESHOLD) * 10
+                        # CAV车辆的警告距离越远，reward越高 - [0, 5]
+                        individual_warn_r += -(WARN_GAP_THRESHOLD - dis) / (WARN_GAP_THRESHOLD - GAP_THRESHOLD) * 10  # [-10, 0]
                     inidividual_rew_ego[veh_id] += individual_warn_r
 
                 if veh_id in self.coll_ego_ids.keys():
                     individual_coll_r = 0
                     for dis in self.coll_ego_ids[veh_id]:
-                        individual_coll_r += -(GAP_THRESHOLD - dis) / GAP_THRESHOLD * 500 - 5
+                        # CAV车辆的碰撞距离越远，reward越高 - [0, 5]
+                        individual_coll_r += -(GAP_THRESHOLD - dis) / GAP_THRESHOLD * 20 - 10  # [-30, -10]
                     inidividual_rew_ego[veh_id] += individual_coll_r
-
-                else:
-                    inidividual_rew_ego[veh_id] += 0
 
                 # 计算局部地区的reward
                 if road_id in self.bottle_necks + ['E3']:
@@ -419,15 +425,23 @@ class VehEnvWrapper(gym.Wrapper):
                     range_reward_ego[veh_id] = 0
 
         # 计算全局reward
-        all_mean_speed = np.mean(all_vehicle_speed)
-        all_ego_mean_speed = np.mean(all_ego_vehicle_speed)
-        all_mean_accumulated_waiting_time = np.mean(all_vehicle_accumulated_waiting_time)
-        all_ego_vehicle_accumulated_waiting_time = np.mean(all_ego_vehicle_accumulated_waiting_time)
+        all_ego_vehicle_speed = np.mean(all_ego_vehicle_speed)  # CAV车辆的平均速度 - 使用target speed
+        all_ego_mean_speed = np.mean(all_ego_vehicle_mean_speed) # CAV车辆的累积平均速度 - 使用速度/时间
+        all_ego_vehicle_accumulated_waiting_time = np.mean(all_ego_vehicle_accumulated_waiting_time)  # CAV车辆的累积平均等待时间
 
-        global_speed_r = -abs(all_mean_speed - max_speed) / max_speed * 5 + 5
-        global_ego_speed_r = -abs(all_ego_mean_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
-        global_waiting_time_r = -all_mean_accumulated_waiting_time / 10
+        all_vehicle_speed = np.mean(all_vehicle_speed)  # CAV和HDV车辆的平均速度 - 使用target speed
+        all_vehicle_mean_speed = np.mean(all_vehicle_mean_speed)  # CAV和HDV车辆的累积平均速度 - 使用速度/时间
+        all_vehicle_accumulated_waiting_time = np.mean(all_vehicle_accumulated_waiting_time)  # CAV和HDV车辆的累积平均等待时间
+
+        # global_speed_pure_r = -abs(all_ego_vehicle_speed - max_speed) / max_speed * 5 + 5
+        # global_speed_r = -abs(all_vehicle_mean_speed - max_speed) / max_speed * 5 + 5
+        # global_ego_speed_r = -abs(all_ego_mean_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
+        # global_waiting_time_r = -all_vehicle_accumulated_waiting_time / 10
+        # global_ego_waiting_time_r = -all_ego_vehicle_accumulated_waiting_time / 10  # [0, 5]
+
+        global_ego_speed_r = -abs(all_ego_vehicle_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
         global_ego_waiting_time_r = -all_ego_vehicle_accumulated_waiting_time / 10  # [0, 5]
+
 
         # TODO： lane_statistics  在E2的等待时间
         # rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + global_speed_r + global_waiting_time_r for
@@ -533,7 +547,10 @@ class VehEnvWrapper(gym.Wrapper):
             assert len(warn_vehs) == 0, f'Warning with {warn_vehs} at reset!!! Regenerate the flow'
 
             # 对 state 进行处理
-            feature_vectors, shared_feature_vectors, _, _, _ = self.state_wrapper(state=init_state)
+            feature_vectors, lane_statistics, _, _ = self.state_wrapper(state=init_state)
+            shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
+                                                                          feature_vectors,
+                                                                          self.bottle_neck_positions)
             self.__init_actions(raw_state=init_state)
 
         return feature_vectors, shared_feature_vectors, {'step_time': self.warmup_steps}
@@ -559,7 +576,7 @@ class VehEnvWrapper(gym.Wrapper):
         ####################################################################
 
         # 对 state 进行处理 (feature_vectors的长度是没有行驶出CAV的数量)
-        feature_vectors, shared_feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
+        feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
 
         # 处理离开路网的车辆 agent_mask 和 out_of_road
         for _ego_id in self.ego_ids:
@@ -593,7 +610,7 @@ class VehEnvWrapper(gym.Wrapper):
             while self.vehicles_info:  # 仿真到没有车在 self.edge_ids
                 init_state, _, _, _, _ = super().step(self.actions)
                 init_state = self.append_surrounding(init_state)
-                feature_vectors, shared_feature_vectors, _, _, reward_statistics = self.state_wrapper(state=init_state)
+                feature_vectors, _, _, reward_statistics = self.state_wrapper(state=init_state)
                 reward = self.reward_wrapper(lane_statistics, ego_statistics, reward_statistics)  # 更新 veh info
                 self.__init_actions(raw_state=init_state)
                 if not rewards:
@@ -610,6 +627,11 @@ class VehEnvWrapper(gym.Wrapper):
                 self.agent_mask[out_of_road_ego_id] = False
                 feature_vectors[out_of_road_ego_id] = [0.0] * 40
                 pass
+
+        # 获取shared_feature_vectors
+        shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
+                                                                      feature_vectors,
+                                                                      self.bottle_neck_positions)
 
         # 处理以下 infos
         if len(self.warn_ego_ids) > 0:
@@ -646,10 +668,14 @@ class VehEnvWrapper(gym.Wrapper):
         #     self.results_writer.write_row(ep_info)
         #     self.rewards_writer = list()
 
-        # For DEBUG
-        # if all([dones[_ego_id] for _ego_id in self.ego_ids]):
-        #     print('stop here')
-
+        # # For DEBUG render
+        # infos['done'] = dones.copy()
+        # infos['reward'] = rewards.copy()
+        # print(infos)
+        # debug = []
+        # for key, value in feature_vectors.items():
+        #     debug.append([key, value[0] * 15])
+        # print(debug)
         return feature_vectors, shared_feature_vectors, rewards, dones.copy(), dones.copy(), infos
 
     def close(self) -> None:
