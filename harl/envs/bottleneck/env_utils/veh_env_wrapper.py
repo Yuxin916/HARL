@@ -114,14 +114,14 @@ class VehEnvWrapper(gym.Wrapper):
     @property
     def observation_space(self):
         obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(40,)
+            low=-np.inf, high=np.inf, shape=(40,)  # FIXED
         )
         return {_ego_id: obs_space for _ego_id in self.ego_ids}
 
     @property
     def share_observation_space(self):
         share_obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(126,)
+            low=-np.inf, high=np.inf, shape=(self.num_CAVs * 4 + 108 + 1 + 1,)
         )
         return {_ego_id: share_obs_space for _ego_id in self.ego_ids}
 
@@ -417,7 +417,7 @@ class VehEnvWrapper(gym.Wrapper):
                     inidividual_rew_ego[veh_id] += individual_coll_r
 
                 # 计算局部地区的reward
-                if road_id in self.bottle_necks + ['E3']:
+                if road_id in self.bottle_necks + ['E3', 'E2', 'E1']:
                     # 快速穿过bottleneck区域 和最后一个lane
                     individual_botte_neck_r = -abs(speed - max_speed) / max_speed * 5 + 5
                     range_reward_ego[veh_id] = individual_botte_neck_r
@@ -444,13 +444,17 @@ class VehEnvWrapper(gym.Wrapper):
 
 
         # TODO： lane_statistics  在E2的等待时间
+        # TODO: 完成时间越短，reward越高 - [0, 5]
+
         # rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + global_speed_r + global_waiting_time_r for
         #            key in inidividual_rew_ego}
         # rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + global_speed_r + global_waiting_time_r + \
         #               global_ego_speed_r + global_ego_waiting_time_r for key in inidividual_rew_ego}
 
         rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + \
-                        global_ego_speed_r + global_ego_waiting_time_r for key in inidividual_rew_ego}
+                        global_ego_speed_r \
+                        + global_ego_waiting_time_r \
+                   for key in inidividual_rew_ego}
 
         return rewards
 
