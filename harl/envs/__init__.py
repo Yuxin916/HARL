@@ -7,7 +7,7 @@ from harl.envs.gym.gym_logger import GYMLogger
 from harl.envs.football.football_logger import FootballLogger
 from harl.envs.dexhands.dexhands_logger import DexHandsLogger
 from harl.envs.lag.lag_logger import LAGLogger
-from harl.envs.metadrive_env.metadrive_env_logger import MetaDriveLogger
+# from harl.envs.metadrive_env.metadrive_env_logger import MetaDriveLogger
 from harl.envs.bottleneck.bottleneck_logger import BottleneckLogger
 
 FLAGS = flags.FLAGS
@@ -22,6 +22,6 @@ LOGGER_REGISTRY = {
     "dexhands": DexHandsLogger,
     "smacv2": SMACv2Logger,
     "lag": LAGLogger,
-    "metadrive": MetaDriveLogger,
+    # "metadrive": MetaDriveLogger,
     "bottleneck": BottleneckLogger,
 }

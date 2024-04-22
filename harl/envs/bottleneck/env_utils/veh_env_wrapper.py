@@ -6,8 +6,9 @@ import numpy as np
 from gymnasium.core import Env
 from loguru import logger
 
-from .generate_scene import generate_scenario
-from .wrapper_utils import (
+# from .generate_scene import generate_scenario
+from generate_scene_MTF import generate_scenario
+from wrapper_utils import (
     analyze_traffic,
     compute_ego_vehicle_features,
     check_collisions_based_pos,
@@ -40,8 +41,9 @@ class VehEnvWrapper(gym.Wrapper):
 
     def __init__(self, env: Env,
                  name_scenario: str,  # 场景的名称
-                 num_HDVs: int,  # HDV 的数量
+                 CAV_penetration: float,  # HDV 的数量
                  num_CAVs: int,  # CAV 的数量
+                 num_HDVs: int,  # HDV 的数量
                  ego_ids: List[str],  # ego vehicle id
                  edge_ids: List[str],  # 路网中所有路段的 id
                  edge_lane_num: Dict[str, int],  # 每个 edge 的车道数
@@ -55,8 +57,9 @@ class VehEnvWrapper(gym.Wrapper):
                  ) -> None:
         super().__init__(env)
         self.name_scenario = name_scenario
-        self.num_HDVs = num_HDVs
+        self.CAV_penetration = CAV_penetration
         self.num_CAVs = num_CAVs
+        self.num_HDVs = num_HDVs
         self.edge_ids = edge_ids
         self.edge_lane_num = edge_lane_num
         self.ego_ids = ego_ids  # 控制车辆的 id
@@ -480,12 +483,16 @@ class VehEnvWrapper(gym.Wrapper):
         self.out_of_road = []
         # 假设这些车初始化都在路网上 活着
         self.agent_mask = {ego_id: True for ego_id in self.ego_ids}
+        self.current_speed = {key: 10 for key in self.ego_ids}
 
         # 初始化环境
         init_state = self.env.reset()
         # 生成车流
-        generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario, HDV_num=self.num_HDVs,
-                          CAV_num=self.num_CAVs)
+        # generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario, HDV_num=self.num_HDVs,
+        #                   CAV_num=self.num_CAVs)  # generate_scene.py
+        generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario, 
+                          CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
+                          distribution="uniform")  # generate_scene_MTF.py - "random" or "uniform" distribution
         # 初始化车辆的速度
         self.__init_actions(raw_state=init_state)
 
@@ -600,7 +607,7 @@ class VehEnvWrapper(gym.Wrapper):
         #         dones[ego_id] = True
 
         # 超出时间 结束仿真
-        if infos['step_time'] > 150:
+        if infos['step_time'] >= 200:
             for ego_id in self.ego_ids:
                 dones[ego_id] = True
                 infos['done_reason'] = 'time out'

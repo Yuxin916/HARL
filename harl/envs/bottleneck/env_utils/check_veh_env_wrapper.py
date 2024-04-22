@@ -22,8 +22,9 @@ if __name__ == '__main__':
 
     # for veh wrapper
     scene_name = "Env_Bottleneck"
-    num_HDVs = 40
-    num_CAVs = 10
+    penetration_CAV = 1
+    num_CAVs = 3
+    num_HDVs = 10
     warmup_steps = 0
     ego_ids = ['CAV_0', 'CAV_1', 'CAV_2',
                'CAV_3', 'CAV_4',
@@ -62,8 +63,9 @@ if __name__ == '__main__':
     ac_env_wrapper = VehEnvWrapper(
         env=ac_env,
         name_scenario=scene_name,
-        num_HDVs=num_HDVs,
+        CAV_penetration=penetration_CAV,
         num_CAVs=num_CAVs,
+        num_HDVs=num_HDVs,
         warmup_steps=warmup_steps,
         ego_ids=ego_ids,
         edge_ids=edge_ids,
@@ -76,7 +78,7 @@ if __name__ == '__main__':
         delta_t=delta_t
     )
 
-    for constant_speed in range(1, 5):  # 测试不同的速度
+    for constant_speed in range(0, 5):  # 测试不同的速度
         """
         在simple中
         0： 不换道
@@ -101,7 +103,7 @@ if __name__ == '__main__':
             logger.info(f'SIM: Info: {infos}')
             logger.info(f'SIM: Warn Vehicle: {ac_env_wrapper.warn_ego_ids}')
             logger.info(f'SIM: Collision Vehicle: {ac_env_wrapper.coll_ego_ids}')
-            time.sleep(10)
+            time.sleep(1)
             if done:
                 print('done')
 

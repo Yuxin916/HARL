@@ -46,26 +46,37 @@ def generate_scenario(use_gui:bool, sce_name:str, HDV_num:int, CAV_num:int):
     '''fixed flow'''
     i_CAV = 0
     i_HDV = 0
+
     for i in range(HDV_num+CAV_num):
-        if i % 5 == 0:
-            scene_change.add(
-            vehID=f'CAV_{i_CAV}',
+        scene_change.add(
+            vehID=f'CAV_{i}',
             typeID='ego',
             routeID='route_0',
             depart="now",
-            departPos=f'{float(250-i/4*20)}',
-            departLane=f'{int(i%4)}',
+            departPos=f'{float(250 - i / 4 * 20)}',
+            departLane=f'{int(i % 4)}',
             departSpeed='10',
         )
-            i_CAV += 1
-        else:
-            scene_change.add(
-            vehID=f'HDV_{i_HDV}',
-            typeID='HDV_2',
-            routeID='route_0',
-            depart="now",
-            departPos=f'{float(250-i/4*20)}',
-            departLane=f'{int(i%4)}',
-            departSpeed='10',
-        )
-            i_HDV += 1
+
+        # if i % 5 == 0:
+        #     scene_change.add(
+        #     vehID=f'CAV_{i_CAV}',
+        #     typeID='ego',
+        #     routeID='route_0',
+        #     depart="now",
+        #     departPos=f'{float(250-i/4*20)}',
+        #     departLane=f'{int(i%4)}',
+        #     departSpeed='10',
+        # )
+        #     i_CAV += 1
+        # else:
+        #     scene_change.add(
+        #     vehID=f'HDV_{i_HDV}',
+        #     typeID='HDV_2',
+        #     routeID='route_0',
+        #     depart="now",
+        #     departPos=f'{float(250-i/4*20)}',
+        #     departLane=f'{int(i%4)}',
+        #     departSpeed='10',
+        # )
+        #     i_HDV += 1
