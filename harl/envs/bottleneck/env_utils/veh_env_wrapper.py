@@ -556,7 +556,7 @@ class VehEnvWrapper(gym.Wrapper):
                                                                           self.bottle_neck_positions)
             self.__init_actions(raw_state=init_state)
 
-        return feature_vectors, shared_feature_vectors, {'step_time': self.warmup_steps}
+        return feature_vectors, shared_feature_vectors, {'step_time': self.warmup_steps+1}
 
     def step(self, action: Dict[str, int]) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         """
@@ -611,14 +611,12 @@ class VehEnvWrapper(gym.Wrapper):
             infos['done_reason'] = 'all CAV vehicles leave the environment'
             # 全局记录下来self.vehicles_info里面不应该包含已经离开的车辆
             init_state, rew, truncated, _d, _ = super().step(self.actions)
-            infos['step_time'] += 1
             init_state = self.append_surrounding(init_state)
             feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
             self.__init_actions(raw_state=init_state)
 
             while len(reward_statistics) > 0:
                 init_state, rew, truncated, _d, _ = super().step(self.actions)
-                infos['step_time'] += 1
                 init_state = self.append_surrounding(init_state)
                 feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
                 self.__init_actions(raw_state=init_state)
@@ -636,7 +634,8 @@ class VehEnvWrapper(gym.Wrapper):
         if len(self.out_of_road) > 0 and len(feature_vectors) > 0:
             for out_of_road_ego_id in self.out_of_road:
                 rewards.update({out_of_road_ego_id: 20.0})  # 离开路网之后 reward 也是 0  # TODO: 注意一下dead mask MARL
-                infos['out_of_road'].append(out_of_road_ego_id)
+                if out_of_road_ego_id not in infos['out_of_road']:
+                    infos['out_of_road'].append(out_of_road_ego_id)
                 self.agent_mask[out_of_road_ego_id] = False
                 feature_vectors[out_of_road_ego_id] = [0.0] * 40
 
