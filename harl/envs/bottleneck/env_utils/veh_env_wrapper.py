@@ -620,7 +620,6 @@ class VehEnvWrapper(gym.Wrapper):
                 init_state = self.append_surrounding(init_state)
                 feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
                 self.__init_actions(raw_state=init_state)
-                # TODO: 这里因为ego_statistics是空导致reward wrapper有warning
                 # rewards = self.reward_wrapper(lane_statistics, ego_statistics, reward_statistics)  # 更新 veh info
 
             infos['out_of_road'] = self.ego_ids
@@ -628,7 +627,7 @@ class VehEnvWrapper(gym.Wrapper):
             rewards = {key: 20.0 for key in self.ego_ids}
             for out_of_road_ego_id in self.out_of_road:
                 self.agent_mask[out_of_road_ego_id] = False
-                feature_vectors[out_of_road_ego_id] = [0.0] * 40 #TODO: 归零？
+                feature_vectors[out_of_road_ego_id] = [0.0] * 40 #TODO: 离开路网的车辆状态应该归零还是保持最后一步的状态？
 
         # 处理以下reward
         if len(self.out_of_road) > 0 and len(feature_vectors) > 0:
@@ -643,7 +642,6 @@ class VehEnvWrapper(gym.Wrapper):
         shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
                                                                       feature_vectors,
                                                                       self.bottle_neck_positions)
-
         # 处理以下 infos
         if len(self.warn_ego_ids) > 0:
             infos['warning'].append(self.warn_ego_ids)
@@ -668,16 +666,6 @@ class VehEnvWrapper(gym.Wrapper):
             for ego_id in self.ego_ids:
                 dones[ego_id] = True
                 infos['done_reason'] = 'time out'
-                # TODO： 是否需要更新reward time penalty
-
-        # 记录结果 #TODO
-        # self.rewards_writer.append(float(sum(rewards.values())))
-        # if all(dones.values()):  # 所有结束才算结束
-        #     ep_rew = sum(self.rewards_writer)
-        #     ep_len = len(self.rewards_writer)
-        #     ep_info = {"r": round(ep_rew, 6), "l": ep_len, "t": round(time.time() - self.t_start, 6)}
-        #     self.results_writer.write_row(ep_info)
-        #     self.rewards_writer = list()
 
         # # For DEBUG render
         # infos['done'] = dones.copy()
