@@ -71,6 +71,7 @@ class VehEnvWrapper(gym.Wrapper):
         self.warmup_steps = warmup_steps
         self.use_gui = use_gui
         self.delta_t = delta_t
+        self.max_num_seconds = self.num_seconds
 
         # 记录当前速度
         self.current_speed = {key: 0 for key in self.ego_ids}
@@ -112,7 +113,7 @@ class VehEnvWrapper(gym.Wrapper):
     @property
     def observation_space(self):
         obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(40,)  # FIXED
+            low=-np.inf, high=np.inf, shape=(40,)  # FIXED #TODO: 是否需要修改一下他的区间 inf
         )
         return {_ego_id: obs_space for _ego_id in self.ego_ids}
 
@@ -607,28 +608,37 @@ class VehEnvWrapper(gym.Wrapper):
 
         else:  # 所有RL车离开的时候, 就结束
             assert len(feature_vectors) == 0, f'All RL vehicles should leave the environment'
-            infos['done_reason'] = 'all RL vehicles leave the environment'
-            rewards = {}
-            while self.vehicles_info:  # 仿真到没有车在 self.edge_ids
-                init_state, _, _, _, _ = super().step(self.actions)
+            infos['done_reason'] = 'all CAV vehicles leave the environment'
+            # 全局记录下来self.vehicles_info里面不应该包含已经离开的车辆
+            init_state, rew, truncated, _d, _ = super().step(self.actions)
+            infos['step_time'] += 1
+            init_state = self.append_surrounding(init_state)
+            feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
+            self.__init_actions(raw_state=init_state)
+
+            while len(reward_statistics) > 0:
+                init_state, rew, truncated, _d, _ = super().step(self.actions)
+                infos['step_time'] += 1
                 init_state = self.append_surrounding(init_state)
-                feature_vectors, _, _, reward_statistics = self.state_wrapper(state=init_state)
-                reward = self.reward_wrapper(lane_statistics, ego_statistics, reward_statistics)  # 更新 veh info
+                feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
                 self.__init_actions(raw_state=init_state)
-                if not rewards:
-                    rewards = reward.copy()
-                else:
-                    ego_id = list(ego_statistics.keys())[0]
-                    rewards[ego_id] += reward[ego_id]
+                # TODO: 这里因为ego_statistics是空导致reward wrapper有warning
+                # rewards = self.reward_wrapper(lane_statistics, ego_statistics, reward_statistics)  # 更新 veh info
+
+            infos['out_of_road'] = self.ego_ids
+            assert set(self.out_of_road) == set(self.ego_ids), f'All RL vehicles should leave the environment'
+            rewards = {key: 20.0 for key in self.ego_ids}
+            for out_of_road_ego_id in self.out_of_road:
+                self.agent_mask[out_of_road_ego_id] = False
+                feature_vectors[out_of_road_ego_id] = [0.0] * 40 #TODO: 归零？
 
         # 处理以下reward
-        if len(self.out_of_road) > 0:
+        if len(self.out_of_road) > 0 and len(feature_vectors) > 0:
             for out_of_road_ego_id in self.out_of_road:
-                rewards[out_of_road_ego_id] = 0.0  # 离开路网之后 reward 也是 0  # TODO: 注意一下dead mask MARL
+                rewards.update({out_of_road_ego_id: 20.0})  # 离开路网之后 reward 也是 0  # TODO: 注意一下dead mask MARL
                 infos['out_of_road'].append(out_of_road_ego_id)
                 self.agent_mask[out_of_road_ego_id] = False
                 feature_vectors[out_of_road_ego_id] = [0.0] * 40
-                pass
 
         # 获取shared_feature_vectors
         shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
@@ -655,7 +665,7 @@ class VehEnvWrapper(gym.Wrapper):
         #         dones[ego_id] = True
 
         # 超出时间 结束仿真
-        if infos['step_time'] >= 200:
+        if infos['step_time'] >= self.max_num_seconds:
             for ego_id in self.ego_ids:
                 dones[ego_id] = True
                 infos['done_reason'] = 'time out'

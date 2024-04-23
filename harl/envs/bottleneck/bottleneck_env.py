@@ -32,6 +32,8 @@ def make_bottleneck_envs(args):
     log_path = path_convert(args['log_path'])
     delta_t = args['delta_t']
 
+    assert len(ego_ids) == num_CAVs, "The number of ego_ids should be equal to the number of CAVs."
+
     veh_env = VehEnvironment(
         sumo_cfg=sumo_cfg,
         num_seconds=num_seconds,
@@ -67,11 +69,18 @@ class BOTTLENECKEnv:
         self.observation_space = list(self.env.observation_space.values())
         self.action_space = list(self.env.action_space.values())
 
+        # FOR DEBUGGING
+        self.ego_ids = self.env.ego_ids
+
     def step(self, actions):
         """
         return local_obs, global_state, rewards, dones, infos, available_actions
         """
+        # for train
         action_dict = {ego_id: action[0] for ego_id, action in zip(self.env.ego_ids, actions)}
+        # for check
+        # action_dict = {ego_id: actions[ego_id] for ego_id in self.env.ego_ids}
+
         obs, s_obs, rew, truncated, done, info = self.env.step(action_dict)
 
         # s_obs = self.convert_shared_obs(obs)
@@ -79,6 +88,12 @@ class BOTTLENECKEnv:
         s_obs = list(s_obs.values())
         rew = np.array(list(rew.values())).reshape((-1, 1))
         done = np.array(list(done.values()))
+
+        self.action_command = self.env.action_command
+        self.current_speed = self.env.current_speed
+        self.current_lane = self.env.current_lane
+        self.warn_ego_ids = self.env.warn_ego_ids
+        self.coll_ego_ids = self.env.coll_ego_ids
 
         return obs, s_obs, rew, done, self.repeat(info), self.get_avail_actions()
 
