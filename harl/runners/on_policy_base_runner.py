@@ -98,9 +98,8 @@ class OnPolicyBaseRunner:
             )
         # 默认使用EP作为state_type
         # EP：EnvironmentProvided global state (EP)：环境提供的全局状态
-        # FP：Featured-Pruned Agent-Specific Global State (FP)： 特征裁剪的特定智能体全局状态
+        # FP：Featured-Pruned Agent-Specific Global State (FP)： 特征裁剪的特定智能体全局状态(不同agent的全局状态不同, 需要agent number)
         self.state_type = env_args.get("state_type", "EP")
-        # TODO： EP or FP need to be added to customized env
 
         # 智能体数量
         self.num_agents = get_num_agents(args["env"], env_args, self.envs)
@@ -263,17 +262,37 @@ class OnPolicyBaseRunner:
                 episode
             )  # logger callback at the beginning of each episode
 
+            # 把actor和critic网络都切换到eval模式
             self.prep_rollout()  # change to eval mode
+
+            # 对于所有并行环境一个episode的每一个时间步
             for step in range(self.algo_args["train"]["episode_length"]):
-                # Sample actions from actors and values from critics
+                """
+                采样动作 - 进入actor network 
+                values: (n_threads, 1) - 所有并行环境在这一个timestep的critic网络的输出
+                actions: (n_threads, n_agents, 1) 
+                action_log_probs: (n_threads, n_agents, 1)
+                rnn_states: (进程数量, n_agents, rnn层数, rnn_hidden_dim)
+                rnn_states_critic: (n_threads, rnn层数, rnn_hidden_dim)
+                """
                 (
                     values,
                     actions,
                     action_log_probs,
-                    rnn_states,
-                    rnn_states_critic,
+                    rnn_states,  # rnn_states是actor的rnn的hidden state
+                    rnn_states_critic,  # rnn_states_critic是critic的rnn的hidden state
                 ) = self.collect(step)
-                # actions: (n_threads, n_agents, action_dim)
+
+                """
+                在得到动作后，执行动作 - 进入环境 ShareVecEnv | step
+                与环境交互一个step，得到obs，share_obs，rewards，dones，infos，available_actions
+                # obs: (n_threads, n_agents, obs_dim)
+                # share_obs: (n_threads, n_agents, share_obs_dim)
+                # rewards: (n_threads, n_agents, 1)
+                # dones: (n_threads, n_agents)
+                # infos: (n_threads)
+                # available_actions: (n_threads, ) of None or (n_threads, n_agents, action_number)
+                """
                 (
                     obs,
                     share_obs,
@@ -282,6 +301,7 @@ class OnPolicyBaseRunner:
                     infos,
                     available_actions,
                 ) = self.envs.step(actions)
+                """每个step更新logger里面的per_step data"""
                 # obs: (n_threads, n_agents, obs_dim)
                 # share_obs: (n_threads, n_agents, share_obs_dim)
                 # rewards: (n_threads, n_agents, 1)
@@ -304,12 +324,18 @@ class OnPolicyBaseRunner:
 
                 self.logger.per_step(data)  # logger callback at each step
 
+                """把这一步的数据存入每一个actor的replay buffer 以及 集中式critic的replay buffer"""
                 self.insert(data)  # insert data into buffer
 
-            # compute return and update network
+            # 收集完了一个episode的所有timestep data，开始计算return，更新网络
+            # compute Q and V using GAE or not
             self.compute()
-            self.prep_training()  # change to train mode
 
+            # 结束这一个episode的交互数据收集
+            # 把actor和critic网络都切换回train模式
+            self.prep_training()
+
+            # 从这里开始，mappo和happo不一样了
             actor_train_infos, critic_train_info = self.train()
 
             # log information
@@ -328,20 +354,40 @@ class OnPolicyBaseRunner:
                     self.eval()
                 self.save()
 
+            # 把上一个episode产生的最后一个timestep的state放入buffer的新的episode的第一个timestep
             self.after_update()
 
     def warmup(self):
-        """Warm up the replay buffer."""
-        # reset env
+        """
+        Warm up the replay buffer.
+        在环境reset之后返回的obs，share_obs，available_actions存入每一个actor的replay buffer 以及 集中式critic的replay buffer
+        """
+        """
+        reset所有的并行环境，返回
+        obs: (n_threads, n_agents, obs_dim)
+        share_obs: (n_threads, n_agents, share_obs_dim)
+        available_actions: (n_threads, n_agents, action_dim)
+        """
         obs, share_obs, available_actions = self.envs.reset()
-        # replay buffer
+
+        # 准备阶段---每一个actor的replay buffer
         for agent_id in range(self.num_agents):
+            # self.actor_buffer[agent_id].obs是[episode_length+1, 进程数量, obs_shape]
+            # self.actor_buffer[agent_id].obs[0]是episode在t=0时的obs [进程数量, obs_shape]
+            # 更多细节看OnPolicyActorBuffer
+            # 在环境reset之后，把所有并行环境下专属于agent_id的obs放入专属于agent_id的buffer的self.obs的第一步里
             self.actor_buffer[agent_id].obs[0] = obs[:, agent_id].copy()
+
             if self.actor_buffer[agent_id].available_actions is not None:
-                self.actor_buffer[agent_id].available_actions[0] = available_actions[
-                    :, agent_id
-                ].copy()
+                # 在环境reset之后
+                # 把所有并行环境下的专属于agent_id的available_actions放入专属于agent_id的buffer的self.available_actions的第一步里
+                self.actor_buffer[agent_id].available_actions[0] = available_actions[:, agent_id].copy()
+
+        # 准备阶段---集中式critic的replay buffer
+        # 更多细节看OnPolicyCriticBufferEP/FP
         if self.state_type == "EP":
+            # 在环境reset之后
+            # 把所有并行环境下的专属于agent_id的share_obs放入专属于agent_id的buffer的self.share_obs的第一步里
             self.critic_buffer.share_obs[0] = share_obs[:, 0].copy()
         elif self.state_type == "FP":
             self.critic_buffer.share_obs[0] = share_obs.copy()
@@ -486,6 +532,7 @@ class OnPolicyBaseRunner:
         )
 
         # If env is done, then reset rnn_state_critic to all zero
+        # 如果哪个env done了，那么就把那个环境的rnn_state (critic)置为0
         if self.state_type == "EP":
             rnn_states_critic[dones_env == True] = np.zeros(
                 ((dones_env == True).sum(), self.recurrent_n, self.rnn_hidden_size),
