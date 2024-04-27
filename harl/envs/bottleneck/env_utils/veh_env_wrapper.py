@@ -7,7 +7,8 @@ from gymnasium.core import Env
 from loguru import logger
 
 # from .generate_scene import generate_scenario
-from .generate_scene_MTF import generate_scenario
+# from .generate_scene_MTF import generate_scenario
+from .generate_scene_fix_num_CAV import generate_scenario
 from .wrapper_utils import (
     analyze_traffic,
     compute_ego_vehicle_features,
