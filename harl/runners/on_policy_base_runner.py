@@ -963,7 +963,8 @@ class OnPolicyBaseRunner:
 
         policy_actor = self.actor[0].actor
         save_good_dir = self.save_dir + "/good_model"
-        os.mkdir(save_good_dir)
+        if not os.path.exists(save_good_dir):
+            os.mkdir(save_good_dir)
         torch.save(
             policy_actor.state_dict(),
             save_good_dir + "/actor_agent" + str(0) + "_" + str(current_timestep) + ".pt",
