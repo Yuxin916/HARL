@@ -1,6 +1,7 @@
 """Base runner for on-policy algorithms."""
 
 import time
+import os
 import numpy as np
 import torch
 import setproctitle
@@ -340,12 +341,18 @@ class OnPolicyBaseRunner:
 
             # log information
             if episode % self.algo_args["train"]["log_interval"] == 0:
-                self.logger.episode_log(
-                    actor_train_infos,
-                    critic_train_info,
-                    self.actor_buffer,
-                    self.critic_buffer,
-                )
+                save_model_signal, current_timestep = self.logger.episode_log(
+                                    actor_train_infos,
+                                    critic_train_info,
+                                    self.actor_buffer,
+                                    self.critic_buffer,
+                                    self.env_args["save_collision"],
+                                    self.env_args["save_episode_step"],
+                                )
+                if save_model_signal:
+                    self.save_good_model(current_timestep)
+                else:
+                    pass
 
             # eval
             if episode % self.algo_args["train"]["eval_interval"] == 0:
@@ -950,6 +957,25 @@ class OnPolicyBaseRunner:
             torch.save(
                 self.value_normalizer.state_dict(),
                 str(self.save_dir) + "/value_normalizer" + ".pt",
+            )
+    def save_good_model(self, current_timestep):
+        """Save Model when the model is good."""
+
+        policy_actor = self.actor[0].actor
+        save_good_dir = self.save_dir + "/good_model"
+        os.mkdir(save_good_dir)
+        torch.save(
+            policy_actor.state_dict(),
+            save_good_dir + "/actor_agent" + str(0) + "_" + str(current_timestep) + ".pt",
+        )
+        policy_critic = self.critic.critic
+        torch.save(
+            policy_critic.state_dict(), save_good_dir + "/critic_agent" + "_" + str(current_timestep) +  ".pt"
+        )
+        if self.value_normalizer is not None:
+            torch.save(
+                self.value_normalizer.state_dict(),
+                save_good_dir + "/value_normalizer" + "_" + str(current_timestep) + ".pt",
             )
 
     def restore(self):

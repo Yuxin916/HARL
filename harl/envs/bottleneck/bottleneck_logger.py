@@ -99,7 +99,8 @@ class BottleneckLogger(BaseLogger):
                 assert self.done_episode_infos[t]['step_time'] == self.done_episode_lens[t]+1, 'episode len not match'
 
     def episode_log(
-            self, actor_train_infos, critic_train_info, actor_buffer, critic_buffer
+            self, actor_train_infos, critic_train_info, actor_buffer, critic_buffer,
+            save_collision, save_episode_step
     ):
         """Log information for each episode."""
 
@@ -183,3 +184,8 @@ class BottleneckLogger(BaseLogger):
             {"average_step_rewards": critic_train_info["average_step_rewards"]},
             self.total_num_steps,
         )
+
+        if average_collision_rate <= save_collision and average_episode_step <= save_episode_step:
+            return True, self.total_num_steps
+        else:
+            return False, self.total_num_steps

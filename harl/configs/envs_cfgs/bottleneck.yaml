@@ -44,3 +44,6 @@ delta_t: 1.0
 aggressive: 0.2
 cautious: 0.2
 normal: 0.6
+
+save_collision: 0.9
+save_episode_step: 40
