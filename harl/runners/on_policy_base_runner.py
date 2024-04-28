@@ -833,9 +833,11 @@ class OnPolicyBaseRunner:
                         _,
                         eval_rewards,
                         eval_dones,
-                        _,
+                        infos,
                         eval_available_actions,
                     ) = self.envs.step(eval_actions[0])
+                    # print('Reward for each CAV:', eval_rewards)
+                    # print()
                     rewards += eval_rewards[0][0]
                     eval_obs = np.expand_dims(np.array(eval_obs), axis=0)
                     eval_available_actions = (
@@ -849,6 +851,10 @@ class OnPolicyBaseRunner:
                         time.sleep(0.1)
                     if np.all(eval_dones):
                         print(f"total reward of this episode: {rewards}")
+                        print(f"Episode Step Time: {infos[0]['step_time']}")
+                        print(f"Collision: {infos[0]['collision']}")
+                        print(f"Done Reason: {infos[0]['done_reason']}")
+                        print('--------------------------------------')
                         break
         else:
             # this env does not need manual expansion of the num_of_parallel_envs dimension
@@ -948,14 +954,24 @@ class OnPolicyBaseRunner:
 
     def restore(self):
         """Restore model parameters."""
-        for agent_id in range(self.num_agents):
-            policy_actor_state_dict = torch.load(
-                str(self.algo_args["train"]["model_dir"])
-                + "/actor_agent"
-                + str(agent_id)
-                + ".pt"
-            )
-            self.actor[agent_id].actor.load_state_dict(policy_actor_state_dict)
+        if self.share_param:
+            for agent_id in range(self.num_agents):
+                policy_actor_state_dict = torch.load(
+                    str(self.algo_args["train"]["model_dir"])
+                    + "/actor_agent"
+                    + '0'
+                    + ".pt"
+                )
+                self.actor[agent_id].actor.load_state_dict(policy_actor_state_dict)
+        else:
+            for agent_id in range(self.num_agents):
+                policy_actor_state_dict = torch.load(
+                    str(self.algo_args["train"]["model_dir"])
+                    + "/actor_agent"
+                    + str(agent_id)
+                    + ".pt"
+                )
+                self.actor[agent_id].actor.load_state_dict(policy_actor_state_dict)
         if not self.algo_args["render"]["use_render"]:
             policy_critic_state_dict = torch.load(
                 str(self.algo_args["train"]["model_dir"]) + "/critic_agent" + ".pt"
