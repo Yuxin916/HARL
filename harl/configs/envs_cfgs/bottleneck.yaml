@@ -39,3 +39,8 @@ calc_features_lane_ids: [ 'E0_0', 'E0_1',
 ]  # 计算对应的 lane 的信息
 log_path: './log/check_veh_env'
 delta_t: 1.0
+
+# generate scene parameters
+aggressive: 0.2
+cautious: 0.2
+normal: 0.6

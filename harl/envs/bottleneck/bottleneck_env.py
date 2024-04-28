@@ -31,6 +31,9 @@ def make_bottleneck_envs(args):
     calc_features_lane_ids = args['calc_features_lane_ids']
     log_path = path_convert(args['log_path'])
     delta_t = args['delta_t']
+    aggressive = args['aggressive']
+    cautious = args['cautious']
+    normal = args['normal']
 
     assert len(ego_ids) == num_CAVs, "The number of ego_ids should be equal to the number of CAVs."
 
@@ -55,7 +58,11 @@ def make_bottleneck_envs(args):
         calc_features_lane_ids=calc_features_lane_ids,
         filepath=log_path,
         use_gui=use_gui,
-        delta_t=delta_t
+        delta_t=delta_t,
+        aggressive=aggressive,
+        cautious=cautious,
+        normal=normal,
+
     )
     return veh_env
 

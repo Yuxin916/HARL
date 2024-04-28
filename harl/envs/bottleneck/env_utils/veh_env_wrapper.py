@@ -58,6 +58,9 @@ class VehEnvWrapper(gym.Wrapper):
                  delta_t: int,  # 动作之间的间隔时间
                  warmup_steps: int,  # reset 的时候仿真的步数, 确保 ego vehicle 可以全部出现
                  use_gui: bool,  # 是否使用 GUI
+                 aggressive: float,  # aggressive 的概率
+                 cautious: float,  # cautious 的概率
+                 normal: float,  # normal 的概率
                  ) -> None:
         super().__init__(env)
         self.name_scenario = name_scenario
@@ -73,6 +76,9 @@ class VehEnvWrapper(gym.Wrapper):
         self.use_gui = use_gui
         self.delta_t = delta_t
         self.max_num_seconds = self.num_seconds
+        self.aggressive = aggressive
+        self.cautious = cautious
+        self.normal = normal
 
         # 记录当前速度
         self.current_speed = {key: 0 for key in self.ego_ids}
@@ -540,7 +546,10 @@ class VehEnvWrapper(gym.Wrapper):
         # 生成车流
         # generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario, HDV_num=self.num_HDVs,
         #                   CAV_num=self.num_CAVs)  # generate_scene.py
-        generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario, 
+        generate_scenario(aggressive = self.aggressive,
+                          cautious = self.cautious,
+                          normal = self.normal,
+                          use_gui=self.use_gui, sce_name=self.name_scenario,
                           CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
                           distribution="uniform")  # generate_scene_MTF.py - "random" or "uniform" distribution
 

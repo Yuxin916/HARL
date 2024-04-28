@@ -4,7 +4,9 @@ import libsumo as ls
 import random
 import math
 
-def generate_scenario(use_gui: bool, sce_name: str, CAV_num: int, CAV_penetration: float, distribution: str):
+def generate_scenario(
+        aggressive, cautious, normal,
+        use_gui: bool, sce_name: str, CAV_num: int, CAV_penetration: float, distribution: str):
     """
     Mixed Traffic Flow (MTF) scenario generation: v_0 = 10 m/s, v_max = 15 m/s
     use_gui: false for libsumo, true for traci
@@ -25,9 +27,9 @@ def generate_scenario(use_gui: bool, sce_name: str, CAV_num: int, CAV_penetratio
     random_numbers_HDV = [random.random() for _ in range(HDV_num)]
     random_HDVs = []
     for i in range(HDV_num):
-        if random_numbers_HDV[i] < 0.2:
+        if random_numbers_HDV[i] < aggressive:
             random_HDVs.append(0)
-        elif random_numbers_HDV[i] < 0.4:
+        elif random_numbers_HDV[i] < aggressive + cautious:
             random_HDVs.append(1)
         else:
             random_HDVs.append(2)
