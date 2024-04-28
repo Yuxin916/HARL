@@ -91,6 +91,7 @@ class VehEnvWrapper(gym.Wrapper):
         self.vehicles_info = {}  # 记录仿真内车辆的 (初始 lane index, travel time)
         self.agent_mask = {ego_id: True for ego_id in self.ego_ids}  # RL控制的车辆是否在路网上
 
+        self.total_timesteps = 0  # 记录总的时间步数
         # #######
         # Writer
         # #######
@@ -440,7 +441,12 @@ class VehEnvWrapper(gym.Wrapper):
         # global_ego_waiting_time_r = -all_ego_vehicle_accumulated_waiting_time / 10  # [0, 5]
 
         global_ego_speed_r = -abs(all_ego_vehicle_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
+        # global_ego_mean_speed_r = -abs(all_ego_mean_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
         global_ego_waiting_time_r = -all_ego_vehicle_accumulated_waiting_time / 10  # [0, 5]
+
+        # global_all_speed_r = -abs(all_vehicle_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
+        # global_all_mean_speed_r = -abs(all_vehicle_mean_speed - max_speed) / max_speed * 5 + 5  # [0, 5]
+        # global_all_waiting_time_r = -all_vehicle_accumulated_waiting_time / 10  # [0, 5]
 
 
         # TODO： lane_statistics  在E2的等待时间
@@ -453,7 +459,11 @@ class VehEnvWrapper(gym.Wrapper):
 
         rewards = {key: inidividual_rew_ego[key] + range_reward_ego[key] + \
                         global_ego_speed_r \
+                        # + global_ego_mean_speed_r \
                         + global_ego_waiting_time_r \
+                        # + global_all_speed_r \
+                        # + global_all_mean_speed_r \
+                        # + global_all_waiting_time_r
                    for key in inidividual_rew_ego}
 
         return rewards
@@ -533,6 +543,28 @@ class VehEnvWrapper(gym.Wrapper):
         generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario, 
                           CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
                           distribution="uniform")  # generate_scene_MTF.py - "random" or "uniform" distribution
+
+        # if 0 <= self.total_timesteps < 1000000:
+        #     assert self.num_CAVs == 5
+        #     assert self.CAV_penetration == 0.5
+        #     # 生成车流
+        #     generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario,
+        #                       CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
+        #                       distribution="uniform")  # generate_scene_MTF.py - "random" or "uniform" distribution
+        #
+        # elif 1000000 <= self.total_timesteps < 2000000:
+        #     self.num_CAVs = 5
+        #     self.CAV_penetration = 0.3
+        #     generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario,
+        #                       CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
+        #                       distribution="uniform")
+        # elif 2000000 <= self.total_timesteps <= 3000000:
+        #     self.num_CAVs = 5
+        #     self.CAV_penetration = 0.1
+        #     generate_scenario(use_gui=self.use_gui, sce_name=self.name_scenario,
+        #                       CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
+        #                       distribution="uniform")
+
         # 初始化车辆的速度
         self.__init_actions(raw_state=init_state)
 
@@ -562,6 +594,8 @@ class VehEnvWrapper(gym.Wrapper):
     def step(self, action: Dict[str, int]) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         """
         """
+        self.total_timesteps += 1
+
         # 已经死了的车辆不控制 - 从 action 中删除
         for ego_id, ego_live in self.agent_mask.items():
             if not ego_live:
@@ -676,6 +710,9 @@ class VehEnvWrapper(gym.Wrapper):
         # for key, value in feature_vectors.items():
         #     debug.append([key, value[0] * 15])
         # print(debug)
+
+        # TODO: 完成时间越短，reward越高 - [0, 5]
+
         return feature_vectors, shared_feature_vectors, rewards, dones.copy(), dones.copy(), infos
 
     def close(self) -> None:
