@@ -77,16 +77,13 @@ class MAPPO(OnPolicyBase):
         else:
             policy_action_loss = -torch.sum(torch.min(surr1, surr2), dim=-1, keepdim=True).mean()
 
-        # # 添加diversity term
-        # # Integrate the diversity loss (Entropy Bonus)
-        # diversity_loss = dist_entropy * self.entropy_coef  # Coefficient for entropy bonus
-        # policy_loss = policy_action_loss - diversity_loss
-
         policy_loss = policy_action_loss
 
         self.actor_optimizer.zero_grad()
 
+        # # 添加diversity term
         (policy_loss - dist_entropy * self.entropy_coef).backward()
+        # policy_loss.backward()
 
         if self.use_max_grad_norm:
             actor_grad_norm = nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
