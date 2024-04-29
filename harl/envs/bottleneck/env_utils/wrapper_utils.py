@@ -470,10 +470,10 @@ def compute_hierarchical_ego_vehicle_features(
         hdv_stats[hdv_id] = [normalized_speed, normalized_position_x, normalized_position_y,
                              normalized_heading] + road_id_one_hot + lane_index_one_hot
 
-    # convert to 2D array (5 * 13)
+    # convert to 2D array (12 * 13)  - 12 is max number of HDVs
     hdv_stats = np.array(list(hdv_stats.values()))
     if 0 < hdv_stats.shape[0] <= 12:
-        # add 0 to make sure the shape is (5, 13)
+        # add 0 to make sure the shape is (12, 13)
         hdv_stats = np.vstack([hdv_stats, np.zeros((12 - hdv_stats.shape[0], 13))])
     elif hdv_stats.shape[0] == 0:
         hdv_stats = np.zeros((12, 13))
@@ -522,13 +522,13 @@ def compute_hierarchical_ego_vehicle_features(
                              normalized_heading] + road_id_one_hot + lane_index_one_hot
     # convert to 2D array (5 * 5)
     cav_stats = np.array(list(cav_stats.values()))
-    if 0 < cav_stats.shape[0] <= 5:
-        # add 0 to make sure the shape is (5, 13)
+    if 0 < cav_stats.shape[0] <= 12:
+        # add 0 to make sure the shape is (12, 13)
         cav_stats = np.vstack([cav_stats, np.zeros((12 - cav_stats.shape[0], 13))])
     elif cav_stats.shape[0] == 0:
         cav_stats = np.zeros((12, 13))
 
-    if len(ego_stats) != 5:
+    if len(ego_stats) != len(ego_ids):
         for ego_id in ego_ids:
             if ego_id not in ego_stats:
                 ego_stats[ego_id] = [0.0] * 13
