@@ -23,7 +23,6 @@ def make_bottleneck_envs(args):
     num_CAVs = args['num_CAVs']
     penetration_CAV = args['penetration_CAV']
     warmup_steps = args['warmup_steps']
-    ego_ids = args['ego_ids']
     edge_ids = args['edge_ids']
     edge_lane_num = args['edge_lane_num']
     bottle_necks = args['bottle_necks']
@@ -35,7 +34,6 @@ def make_bottleneck_envs(args):
     cautious = args['cautious']
     normal = args['normal']
 
-    assert len(ego_ids) == num_CAVs, "The number of ego_ids should be equal to the number of CAVs."
 
     veh_env = VehEnvironment(
         sumo_cfg=sumo_cfg,
@@ -50,7 +48,6 @@ def make_bottleneck_envs(args):
         num_CAVs=num_CAVs,
         CAV_penetration=penetration_CAV,
         warmup_steps=warmup_steps,
-        ego_ids=ego_ids,
         edge_ids=edge_ids,
         edge_lane_num=edge_lane_num,
         bottle_necks=bottle_necks,
@@ -78,6 +75,7 @@ class BOTTLENECKEnv:
 
         # FOR DEBUGGING
         self.ego_ids = self.env.ego_ids
+        self.total_timesteps = self.env.total_timesteps
 
     def step(self, actions):
         """
@@ -101,6 +99,7 @@ class BOTTLENECKEnv:
         self.current_lane = self.env.current_lane
         self.warn_ego_ids = self.env.warn_ego_ids
         self.coll_ego_ids = self.env.coll_ego_ids
+        self.total_timesteps = self.env.total_timesteps
 
         return obs, s_obs, rew, done, self.repeat(info), self.get_avail_actions()
 

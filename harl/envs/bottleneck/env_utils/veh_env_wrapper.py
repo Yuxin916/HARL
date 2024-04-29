@@ -1,6 +1,6 @@
 import time
 from typing import Any, SupportsFloat, Tuple, Dict, List
-
+import random
 import gymnasium as gym
 import numpy as np
 from gymnasium.core import Env
@@ -48,7 +48,6 @@ class VehEnvWrapper(gym.Wrapper):
                  name_scenario: str,  # 场景的名称
                  CAV_penetration: float,  # HDV 的数量
                  num_CAVs: int,  # CAV 的数量
-                 ego_ids: List[str],  # ego vehicle id
                  edge_ids: List[str],  # 路网中所有路段的 id
                  edge_lane_num: Dict[str, int],  # 每个 edge 的车道数
                  calc_features_lane_ids: List[str],  # 需要统计特征的 lane id
@@ -66,9 +65,13 @@ class VehEnvWrapper(gym.Wrapper):
         self.name_scenario = name_scenario
         self.CAV_penetration = CAV_penetration
         self.num_CAVs = num_CAVs
+
+        # random generate self.num_CAVs CAVs from range (4, 6)
+        # self.num_CAVs = random.choice([4, 5, 6])
+        # self.CAV_penetration = random.choice([0.4, 0.5, 0.6])
+
         self.edge_ids = edge_ids
         self.edge_lane_num = edge_lane_num
-        self.ego_ids = ego_ids  # 控制车辆的 id
         self.bottle_necks = bottle_necks
         self.calc_features_lane_ids = calc_features_lane_ids  # 需要统计特征的 lane id
         self.bottle_neck_positions = bottle_neck_positions  # bottle neck 的坐标
@@ -79,6 +82,8 @@ class VehEnvWrapper(gym.Wrapper):
         self.aggressive = aggressive
         self.cautious = cautious
         self.normal = normal
+
+        self.ego_ids = [f'CAV_{i}' for i in range(self.num_CAVs)]
 
         # 记录当前速度
         self.current_speed = {key: 0 for key in self.ego_ids}
