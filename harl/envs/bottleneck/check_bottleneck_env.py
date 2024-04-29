@@ -14,7 +14,7 @@ set_logger(path_convert('./'), file_log_level="ERROR", terminal_log_level='INFO'
 
 
 if __name__ == '__main__':
-    args = yaml.load(open('/home/tsaisplus/MARL/HARL/harl/configs/envs_cfgs/bottleneck.yaml', 'r'), Loader=yaml.FullLoader)
+    args = yaml.load(open('/home/tsaisplus/generalized_traffic/HARL/harl/configs/envs_cfgs/bottleneck.yaml', 'r'), Loader=yaml.FullLoader)
     env = BOTTLENECKEnv(args)
 
     for constant_speed in range(0, 5):  # 测试不同的速度
@@ -42,6 +42,7 @@ if __name__ == '__main__':
             logger.info(f'SIM: Info: {infos[0]}')
             logger.info(f'SIM: Warn Vehicle: {env.warn_ego_ids}')
             logger.info(f'SIM: Collision Vehicle: {env.coll_ego_ids}')
+            logger.info(f'SIM: Total Timesteps: {env.total_timesteps}')
             time.sleep(0.1)
             if done:
                 print('done')

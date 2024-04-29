@@ -3,7 +3,7 @@ import torch.nn as nn
 from harl.utils.envs_tools import check
 from harl.models.base.cnn import CNNBase
 from harl.models.base.mlp import MLPBase
-# from harl.models.base.self_attention_multi_head import Encoder # multi head self attention
+from harl.models.base.self_attention_multi_head import Encoder # multi head self attention
 from harl.models.base.rnn import RNNLayer
 from harl.models.base.act import ACTLayer
 from harl.utils.envs_tools import get_shape_from_obs_space
@@ -34,7 +34,7 @@ class StochasticPolicy(nn.Module):
         obs_shape = get_shape_from_obs_space(obs_space)
         base = CNNBase if len(obs_shape) == 3 else MLPBase
         self.base = base(args, obs_shape)
-        # self.attention = Encoder(obs_shape[0], action_space.n, 1, self.hidden_sizes[-1], 4, 'Discrete')
+        self.attention = Encoder(obs_shape[0], action_space.n, 1, self.hidden_sizes[-1], 4, 'Discrete')
 
         if self.use_naive_recurrent_policy or self.use_recurrent_policy:
             self.rnn = RNNLayer(
@@ -77,8 +77,8 @@ class StochasticPolicy(nn.Module):
         if available_actions is not None:
             available_actions = check(available_actions).to(**self.tpdv)
 
-        actor_features = self.base(obs)
-        # actor_features = self.attention(obs)
+        # actor_features = self.base(obs)
+        actor_features = self.attention(obs)
         if self.use_naive_recurrent_policy or self.use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 
@@ -115,8 +115,8 @@ class StochasticPolicy(nn.Module):
         if active_masks is not None:
             active_masks = check(active_masks).to(**self.tpdv)
 
-        actor_features = self.base(obs)
-        # actor_features = self.attention(obs)
+        # actor_features = self.base(obs)
+        actor_features = self.attention(obs)
 
         if self.use_naive_recurrent_policy or self.use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
