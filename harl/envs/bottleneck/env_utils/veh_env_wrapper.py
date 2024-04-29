@@ -12,12 +12,15 @@ from .generate_scene_fix_num_CAV import generate_scenario
 from .wrapper_utils import (
     analyze_traffic,
     compute_ego_vehicle_features,
+    compute_hierarchical_ego_vehicle_features,
     compute_centralized_vehicle_features,
+    compute_centralized_vehicle_features_hieratical_version,
     check_collisions_based_pos,
     check_collisions
 )
 from tshub.utils.get_abs_path import get_abs_path
 from tshub.utils.init_log import set_logger
+
 # 获得全局路径
 path_convert = get_abs_path(__file__)
 # 设置日志 -- tshub自带的给环境的
@@ -126,14 +129,14 @@ class VehEnvWrapper(gym.Wrapper):
     @property
     def observation_space(self):
         obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(40,)  # FIXED #TODO: 是否需要修改一下他的区间 inf
+            low=-np.inf, high=np.inf, shape=(435,)  # FIXED #TODO: 是否需要修改一下他的区间 inf
         )
         return {_ego_id: obs_space for _ego_id in self.ego_ids}
 
     @property
     def share_observation_space(self):
         share_obs_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(self.num_CAVs * 4 + 108 + 1 + 1,)
+            low=-np.inf, high=np.inf, shape=(435,)
         )
         return {_ego_id: share_obs_space for _ego_id in self.ego_ids}
 
@@ -231,17 +234,19 @@ class VehEnvWrapper(gym.Wrapper):
                     ego_road_id = ego_lane.split('_')[0]
 
                     if back_vehicle_lane_index != ego_lane_index:
-                    # if back_vehicle_lane != ego_lane:
+                        # if back_vehicle_lane != ego_lane:
                         pass
                     else:
                         if back_vehicle[0][:3] == 'HDV':
                             # 相对速度 - ego车的速度 - 后车的速度的差值
-                            relative_speed = traci.vehicle.getSpeed(vehicle_id) - traci.vehicle.getSpeed(back_vehicle[0])
+                            relative_speed = traci.vehicle.getSpeed(vehicle_id) - traci.vehicle.getSpeed(
+                                back_vehicle[0])
                             # traci得到的距离是ego到后车头部减去minGap的距离，所以要加上minGap（此时后车是HDV）
                             surrounding_vehicle['back'] = (back_vehicle[0], 0, -(back_vehicle[1] + 1.5), relative_speed)
                         elif back_vehicle[0][:3] == 'CAV':
                             # 相对速度 - ego车的速度 - 后车的速度的差值
-                            relative_speed = traci.vehicle.getSpeed(vehicle_id) - traci.vehicle.getSpeed(back_vehicle[0])
+                            relative_speed = traci.vehicle.getSpeed(vehicle_id) - traci.vehicle.getSpeed(
+                                back_vehicle[0])
                             # traci得到的距离是ego到后车头部减去minGap的距离，所以要加上minGap（此时后车是CAV）
                             surrounding_vehicle['back'] = (back_vehicle[0], 0, -(back_vehicle[1] + 1.0), relative_speed)
 
@@ -298,7 +303,7 @@ class VehEnvWrapper(gym.Wrapper):
         state = state['vehicle'].copy()  # 只需要分析车辆的信息
 
         # 计算车辆和地图的数据
-        lane_statistics, ego_statistics, reward_statistics = analyze_traffic(
+        lane_statistics, ego_statistics, reward_statistics, hdv_statistics = analyze_traffic(
             state=state, lane_ids=self.calc_features_lane_ids
         )
 
@@ -315,17 +320,28 @@ class VehEnvWrapper(gym.Wrapper):
         #     num_lane=4
         # ) # TODO： 他们使用cogestion level来认为调整速度
 
+        # # 计算每个 ego vehicle 的 state 拼接为向量
+        # feature_vectors = compute_ego_vehicle_features(
+        #     lane_statistics=lane_statistics,
+        #     ego_statistics=ego_statistics,
+        #     unique_edges=self.edge_ids,
+        #     edge_lane_num=self.edge_lane_num,
+        #     bottle_neck_positions=self.bottle_neck_positions,
+        #
+        # )
+
         # 计算每个 ego vehicle 的 state 拼接为向量
-        feature_vectors = compute_ego_vehicle_features(
+        feature_vectors, feature_vectors_flatten = compute_hierarchical_ego_vehicle_features(
+            hdv_statistics=hdv_statistics,
             lane_statistics=lane_statistics,
             ego_statistics=ego_statistics,
             unique_edges=self.edge_ids,
             edge_lane_num=self.edge_lane_num,
             bottle_neck_positions=self.bottle_neck_positions,
-
+            ego_ids=self.ego_ids,
         )
 
-        return feature_vectors, lane_statistics, ego_statistics, reward_statistics
+        return feature_vectors, feature_vectors_flatten, lane_statistics, ego_statistics, reward_statistics
 
     def reward_wrapper(self, lane_statistics, ego_statistics, reward_statistics) -> float:
         """
@@ -418,8 +434,9 @@ class VehEnvWrapper(gym.Wrapper):
                     individual_warn_r = 0
                     for dis in self.warn_ego_ids[veh_id]:
                         # CAV车辆的警告距离越远，reward越高 - [0, 5]
-                        individual_warn_r += -(WARN_GAP_THRESHOLD - dis) / (WARN_GAP_THRESHOLD - GAP_THRESHOLD) * 10  # [-10, 0]
-                    inidividual_rew_ego[veh_id] += individual_warn_r  * 0.25
+                        individual_warn_r += -(WARN_GAP_THRESHOLD - dis) / (
+                                WARN_GAP_THRESHOLD - GAP_THRESHOLD) * 10  # [-10, 0]
+                    inidividual_rew_ego[veh_id] += individual_warn_r * 0.25
 
                 if veh_id in self.coll_ego_ids.keys():
                     individual_coll_r = 0
@@ -438,7 +455,7 @@ class VehEnvWrapper(gym.Wrapper):
 
         # 计算全局reward
         all_ego_vehicle_speed = np.mean(all_ego_vehicle_speed)  # CAV车辆的平均速度 - 使用target speed
-        all_ego_mean_speed = np.mean(all_ego_vehicle_mean_speed) # CAV车辆的累积平均速度 - 使用速度/时间
+        all_ego_mean_speed = np.mean(all_ego_vehicle_mean_speed)  # CAV车辆的累积平均速度 - 使用速度/时间
         all_ego_vehicle_accumulated_waiting_time = np.mean(all_ego_vehicle_accumulated_waiting_time)  # CAV车辆的累积平均等待时间
 
         all_vehicle_speed = np.mean(all_vehicle_speed)  # CAV和HDV车辆的平均速度 - 使用target speed
@@ -552,9 +569,9 @@ class VehEnvWrapper(gym.Wrapper):
         # 初始化环境
         init_state = self.env.reset()
         # 生成车流
-        generate_scenario(aggressive = self.aggressive,
-                          cautious = self.cautious,
-                          normal = self.normal,
+        generate_scenario(aggressive=self.aggressive,
+                          cautious=self.cautious,
+                          normal=self.normal,
                           use_gui=self.use_gui, sce_name=self.name_scenario,
                           CAV_num=self.num_CAVs, CAV_penetration=self.CAV_penetration,
                           distribution="uniform")  # generate_scene_MTF.py - "random" or "uniform" distribution
@@ -598,13 +615,16 @@ class VehEnvWrapper(gym.Wrapper):
             assert len(warn_vehs) == 0, f'Warning with {warn_vehs} at reset!!! Regenerate the flow'
 
             # 对 state 进行处理
-            feature_vectors, lane_statistics, _, _ = self.state_wrapper(state=init_state)
-            shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
-                                                                          feature_vectors,
-                                                                          self.bottle_neck_positions)
+            feature_vectors, feature_vectors_flatten, lane_statistics, _, _ = self.state_wrapper(state=init_state)
+            # shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
+            #                                                               feature_vectors,
+            #                                                               self.bottle_neck_positions)
+            shared_features, shared_features_flatten = compute_centralized_vehicle_features_hieratical_version(
+                lane_statistics,
+                feature_vectors, feature_vectors_flatten)
             self.__init_actions(raw_state=init_state)
 
-        return feature_vectors, shared_feature_vectors, {'step_time': self.warmup_steps+1}
+        return feature_vectors_flatten, shared_features_flatten, {'step_time': self.warmup_steps + 1}
 
     def step(self, action: Dict[str, int]) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         """
@@ -621,15 +641,18 @@ class VehEnvWrapper(gym.Wrapper):
         # 在环境里走一步
         init_state, rewards, truncated, _dones, infos = super().step(action)
         init_state = self.append_surrounding(init_state)
-        self.current_speed = {key: init_state['vehicle'][key]['speed'] if key in init_state['vehicle'] else 0 for key in self.ego_ids}
-        self.current_lane = {key: init_state['vehicle'][key]['lane_id'] if key in init_state['vehicle'] else 0 for key in self.ego_ids}
+        self.current_speed = {key: init_state['vehicle'][key]['speed'] if key in init_state['vehicle'] else 0 for key in
+                              self.ego_ids}
+        self.current_lane = {key: init_state['vehicle'][key]['lane_id'] if key in init_state['vehicle'] else 0 for key
+                             in self.ego_ids}
 
         ################# 碰撞检查 ###########################################
         self.check_collisions(init_state)
         ####################################################################
 
         # 对 state 进行处理 (feature_vectors的长度是没有行驶出CAV的数量)
-        feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
+        feature_vectors, feature_vectors_flatten, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(
+            state=init_state)
 
         # 处理离开路网的车辆 agent_mask 和 out_of_road
         for _ego_id in self.ego_ids:
@@ -662,13 +685,15 @@ class VehEnvWrapper(gym.Wrapper):
             # 全局记录下来self.vehicles_info里面不应该包含已经离开的车辆
             init_state, rew, truncated, _d, _ = super().step(self.actions)
             init_state = self.append_surrounding(init_state)
-            feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
+            feature_vectors, feature_vectors_flatten, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(
+                state=init_state)
             self.__init_actions(raw_state=init_state)
 
             while len(reward_statistics) > 0:
                 init_state, rew, truncated, _d, _ = super().step(self.actions)
                 init_state = self.append_surrounding(init_state)
-                feature_vectors, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(state=init_state)
+                feature_vectors, feature_vectors_flatten, lane_statistics, ego_statistics, reward_statistics = self.state_wrapper(
+                    state=init_state)
                 self.__init_actions(raw_state=init_state)
                 # rewards = self.reward_wrapper(lane_statistics, ego_statistics, reward_statistics)  # 更新 veh info
 
@@ -677,7 +702,7 @@ class VehEnvWrapper(gym.Wrapper):
             rewards = {key: 20.0 for key in self.ego_ids}
             for out_of_road_ego_id in self.out_of_road:
                 self.agent_mask[out_of_road_ego_id] = False
-                feature_vectors[out_of_road_ego_id] = [0.0] * 40 #TODO: 离开路网的车辆状态应该归零还是保持最后一步的状态？
+                feature_vectors_flatten[out_of_road_ego_id] = np.zeros(435)  # TODO: 离开路网的车辆状态应该归零还是保持最后一步的状态？
 
         # 处理以下reward
         if len(self.out_of_road) > 0 and len(feature_vectors) > 0:
@@ -686,12 +711,15 @@ class VehEnvWrapper(gym.Wrapper):
                 if out_of_road_ego_id not in infos['out_of_road']:
                     infos['out_of_road'].append(out_of_road_ego_id)
                 self.agent_mask[out_of_road_ego_id] = False
-                feature_vectors[out_of_road_ego_id] = [0.0] * 40
+                feature_vectors_flatten[out_of_road_ego_id] = np.zeros(435)
 
         # 获取shared_feature_vectors
-        shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
-                                                                      feature_vectors,
-                                                                      self.bottle_neck_positions)
+        # shared_feature_vectors = compute_centralized_vehicle_features(lane_statistics,
+        #                                                               feature_vectors,
+        #                                                               self.bottle_neck_positions)
+        shared_features, shared_features_flatten = compute_centralized_vehicle_features_hieratical_version(
+            lane_statistics,
+            feature_vectors, feature_vectors_flatten)
         # 处理以下 infos
         if len(self.warn_ego_ids) > 0:
             infos['warning'].append(self.warn_ego_ids)
@@ -728,7 +756,14 @@ class VehEnvWrapper(gym.Wrapper):
 
         # TODO: 完成时间越短，reward越高 - [0, 5]
 
-        return feature_vectors, shared_feature_vectors, rewards, dones.copy(), dones.copy(), infos
+        # # check if all element in feature_vectors_flatten have same length
+        # if len(shared_features_flatten) != 5:
+        #     print('break')
+        # for value in shared_features_flatten.values():
+        #     if len(value) != 253 or (not isinstance(value, np.ndarray)):
+        #         print('break')
+
+        return feature_vectors_flatten, shared_features_flatten, rewards, dones.copy(), dones.copy(), infos
 
     def close(self) -> None:
         return super().close()

@@ -57,6 +57,8 @@ def analyze_traffic(state, lane_ids):
     }
     # 初始化 ego vehicle 的统计信息
     ego_statistics = {}
+    # 初始化 hdv vehicle 的统计信息
+    hdv_statistics = {}
     # 初始化 reward_statistics, 用于记录每一辆车所在的 edge, 后面用于统计车辆的 travel time
     reward_statistics = {}
 
@@ -106,6 +108,10 @@ def analyze_traffic(state, lane_ids):
                                           heading, road_id, lane_index,
                                           surroundings
                                           ]
+        # HDV车需要的信息
+        else:
+            hdv_statistics[vehicle_id] = [speed, position,
+                                          heading, road_id, lane_index]
 
         # 根据lane_id把以下信息写进lane_statistics
         if lane_id in lane_statistics:
@@ -140,7 +146,7 @@ def analyze_traffic(state, lane_ids):
     # lane_statistics转换成dict
     lane_statistics = {lane_id: stats for lane_id, stats in lane_statistics.items()}
 
-    return lane_statistics, ego_statistics, reward_statistics
+    return lane_statistics, ego_statistics, reward_statistics, hdv_statistics
 
 
 def check_collisions_based_pos(vehicles, gap_threshold: float):
@@ -172,7 +178,6 @@ def check_collisions_based_pos(vehicles, gap_threshold: float):
 
 
 def check_collisions(vehicles, ego_ids, gap_threshold: float, gap_warn_collision: float):
-
     ego_collision = []
     ego_warn = []
 
@@ -386,8 +391,7 @@ def compute_ego_vehicle_features(
 
         feature_vector = [normalized_speed, normalized_position_x, normalized_position_y, normalized_heading,
                           bottle_neck_position_x, bottle_neck_position_y, normalized_distance] + \
-                          road_id_one_hot + lane_index_one_hot + flat_surround + ego_lane_stats
-
+                         road_id_one_hot + lane_index_one_hot + flat_surround + ego_lane_stats
 
         # Assign the feature vector to the corresponding ego vehicle
         feature_vectors[ego_id] = [float(item) for item in feature_vector]
@@ -395,7 +399,190 @@ def compute_ego_vehicle_features(
     # 保证每一个 ego vehicle 的特征长度一致
     assert all(len(feature_vector) == 40 for feature_vector in feature_vectors.values())
 
+    # # Create a new dictionary to hold the updated feature lists
+    # updated_feature_vectors = {}
+    #
+    # # Iterate over each key-value pair in the dictionary
+    # for cav, features in feature_vectors.items():
+    #     # Start with the original list of features
+    #     new_features = features.copy()
+    #     # Iterate over all other CAVs
+    #     for other_cav, other_features in feature_vectors.items():
+    #         if other_cav != cav:
+    #             # Append the first four elements of the other CAV's features
+    #             new_features.extend(other_features[:4])
+    #     # Update the dictionary with the new list
+    #     updated_feature_vectors[cav] = new_features
+    #
+    # for updated_feature_vector in updated_feature_vectors.values():
+    #     if not len(updated_feature_vector) == 56:
+    #         updated_feature_vector += [0] * (56 - len(updated_feature_vector))
+    #
+    # # assert all(len(updated_feature_vector) == 56 for updated_feature_vector in updated_feature_vectors.values())
+
     return feature_vectors
+
+
+def compute_hierarchical_ego_vehicle_features(
+        hdv_statistics: Dict[str, List[Union[float, str, Tuple[int]]]],
+        ego_statistics: Dict[str, List[Union[float, str, Tuple[int]]]],
+        lane_statistics: Dict[str, List[float]],
+        unique_edges: List[str],
+        edge_lane_num: Dict[str, int],
+        bottle_neck_positions: Tuple[float],
+        ego_ids: List[str]
+) -> Dict[str, List[float]]:
+    """计算每一个 ego vehicle 的特征
+
+    Args:
+        ego_statistics (Dict[str, List[Union[float, str, Tuple[int]]]]): ego vehicle 的信息
+        lane_statistics (Dict[str, List[float]]): 路网的信息
+        unique_edges (List[str]): 所有考虑的 edge
+        edge_lane_num (Dict[str, int]): 每一个 edge 对应的车道
+        bottle_neck_positions (Tuple[float]): bottle neck 的坐标
+    """
+
+    # ############################## 所有HDV的信息 ############################## 13
+    hdv_stats = {}
+    for hdv_id, hdv_info in hdv_statistics.items():
+        speed, position, heading, road_id, lane_index = hdv_info
+
+        # 速度归一化  - 1
+        normalized_speed = speed / 15.0
+
+        # 位置归一化  - 2
+        position_x, position_y = position
+        normalized_position_x = position_x / 700
+        normalized_position_y = position_y
+
+        # 转向归一化 - 1
+        normalized_heading = heading / 360
+
+        # One-hot encode road_id - 5
+        road_id_one_hot = one_hot_encode(road_id, unique_edges)
+
+        # One-hot encode lane_index - 4
+        lane_index_one_hot = one_hot_encode(lane_index, list(range(edge_lane_num.get(road_id, 0))))
+        # 如果车道数不足4个, 补0 对齐到最多数量的lane num
+        if len(lane_index_one_hot) < 4:
+            lane_index_one_hot += [0] * (4 - len(lane_index_one_hot))
+
+        hdv_stats[hdv_id] = [normalized_speed, normalized_position_x, normalized_position_y,
+                             normalized_heading] + road_id_one_hot + lane_index_one_hot
+
+    # convert to 2D array (5 * 13)
+    hdv_stats = np.array(list(hdv_stats.values()))
+    if 0 < hdv_stats.shape[0] <= 12:
+        # add 0 to make sure the shape is (5, 13)
+        hdv_stats = np.vstack([hdv_stats, np.zeros((12 - hdv_stats.shape[0], 13))])
+    elif hdv_stats.shape[0] == 0:
+        hdv_stats = np.zeros((12, 13))
+
+    # ############################## 所有CAV的信息 ############################## 13
+    cav_stats = {}
+    ego_stats = {}
+    for ego_id, ego_info in ego_statistics.items():
+        # ############################## 自己车的信息 ############################## 13
+        speed, position, heading, road_id, lane_index, surroundings = ego_info
+
+        # 速度归一化  - 1
+        normalized_speed = speed / 15.0
+
+        # 位置归一化  - 2
+        position_x, position_y = position
+        normalized_position_x = position_x / 700
+        normalized_position_y = position_y
+
+        # 转向归一化 - 1
+        normalized_heading = heading / 360
+
+        # One-hot encode road_id - 5
+        road_id_one_hot = one_hot_encode(road_id, unique_edges)
+
+        # One-hot encode lane_index - 4
+        lane_index_one_hot = one_hot_encode(lane_index, list(range(edge_lane_num.get(road_id, 0))))
+        # 如果车道数不足4个, 补0 对齐到最多数量的lane num
+        if len(lane_index_one_hot) < 4:
+            lane_index_one_hot += [0] * (4 - len(lane_index_one_hot))
+
+        # ############################## 周车信息 ############################## 18
+        # 提取surrounding的信息 -18
+        surround = []
+        for index, (_, statistics) in enumerate(surroundings.items()):
+            relat_x, relat_y, relat_v = statistics[1:4]
+            surround.append([relat_x, relat_y, relat_v])  # relat_x, relat_y, relat_v
+        flat_surround = [item for sublist in surround for item in sublist]
+        # 如果周围车辆的信息不足6*3个, 补0 对齐到最多数量的周车信息
+        if len(flat_surround) < 18:
+            flat_surround += [0] * (18 - len(flat_surround))
+
+        cav_stats[ego_id] = [normalized_speed, normalized_position_x, normalized_position_y,
+                             normalized_heading] + road_id_one_hot + lane_index_one_hot
+        ego_stats[ego_id] = [normalized_speed, normalized_position_x, normalized_position_y,
+                             normalized_heading] + road_id_one_hot + lane_index_one_hot
+    # convert to 2D array (5 * 5)
+    cav_stats = np.array(list(cav_stats.values()))
+    if 0 < cav_stats.shape[0] <= 5:
+        # add 0 to make sure the shape is (5, 13)
+        cav_stats = np.vstack([cav_stats, np.zeros((12 - cav_stats.shape[0], 13))])
+    elif cav_stats.shape[0] == 0:
+        cav_stats = np.zeros((12, 13))
+
+    if len(ego_stats) != 5:
+        for ego_id in ego_ids:
+            if ego_id not in ego_stats:
+                ego_stats[ego_id] = [0.0] * 13
+
+    # ############################## lane_statistics 的信息 ############################## 18
+    # Initialize a list to hold all lane statistics
+    all_lane_stats = {}
+
+    # Iterate over all possible lanes to get their statistics
+    for lane_id, lane_info in lane_statistics.items():
+        # - vehicle_count: 当前车道的车辆数 1
+        # - lane_density: 当前车道的车辆密度 1
+        # - lane_length: 这个车道的长度 1
+        # - speeds: 在这个车道上车的速度 1 (mean)
+        # - waiting_times: 一旦车辆开始行驶，等待时间清零 1  (mean)
+        # - accumulated_waiting_times: 车的累积等待时间 1 (mean)
+
+        all_lane_stats[lane_id] = lane_info[:4] + lane_info[6:7] + lane_info[9:10]
+
+    # convert to 2D array (18 * 6)
+    all_lane_stats = np.array(list(all_lane_stats.values()))
+
+    # ############################## bottle_neck 的信息 ##############################
+    # 车辆距离bottle_neck
+    bottle_neck_position_x = bottle_neck_positions[0] / 700
+    bottle_neck_position_y = bottle_neck_positions[1]
+
+    feature_vector = {}
+    feature_vector['hdv_stats'] = hdv_stats
+    feature_vector['cav_stats'] = cav_stats
+    feature_vector['all_lane_stats'] = all_lane_stats
+    feature_vector['bottle_neck_position'] = np.array([bottle_neck_position_x, bottle_neck_position_y])
+
+    feature_vectors = {}
+    for ego_id in ego_statistics.keys():
+        feature_vectors[ego_id] = feature_vector.copy()
+        feature_vectors[ego_id]['self_stats'] = ego_stats[ego_id]
+
+    # A function to flatten a dictionary structure into 1D array
+    def flatten_to_1d(data_dict):
+        flat_list = []
+        for key, item in data_dict.items():
+            if isinstance(item, list):
+                flat_list.extend(item)
+            elif isinstance(item, np.ndarray):
+                flat_list.extend(item.flatten())
+        return np.array(flat_list)
+
+    # Flatten the dictionary structure
+    feature_vectors_flatten = {ego_id: flatten_to_1d(feature_vector) for ego_id, feature_vector in
+                               feature_vectors.items()}
+
+    return feature_vectors, feature_vectors_flatten
+
 
 def compute_centralized_vehicle_features(lane_statistics, feature_vectors, bottle_neck_positions):
     shared_features = {}
@@ -428,8 +615,31 @@ def compute_centralized_vehicle_features(lane_statistics, feature_vectors, bottl
     for ego_id in feature_vectors.keys():
         shared_features[ego_id] = [bottle_neck_position_x, bottle_neck_position_y] + all_vehicle + all_lane_stats
 
-    # if not all(len(shared_feature) == 126 for shared_feature in shared_features.values()):
-    #     print('shared_features:', shared_features)
     # assert all(len(shared_feature) == 130 for shared_feature in shared_features.values())
 
     return shared_features
+
+
+def compute_centralized_vehicle_features_hieratical_version(lane_statistics, feature_vectors, feature_vectors_flatten):
+    shared_features = {}
+
+    for ego_id in feature_vectors.keys():
+        shared_features[ego_id] = feature_vectors[ego_id].copy()
+
+    def flatten_to_1d(data_dict):
+        flat_list = []
+        for key, item in data_dict.items():
+            if isinstance(item, list):
+                flat_list.extend(item)
+            elif isinstance(item, np.ndarray):
+                flat_list.extend(item.flatten())
+        return np.array(flat_list)
+
+    shared_features_flatten = {ego_id: flatten_to_1d(feature_vector) for ego_id, feature_vector in
+                               shared_features.items()}
+    if len(shared_features_flatten) != 5:
+        for ego_id in feature_vectors_flatten.keys():
+            if ego_id not in shared_features_flatten:
+                shared_features_flatten[ego_id] = np.zeros(435)
+
+    return shared_features, shared_features_flatten
