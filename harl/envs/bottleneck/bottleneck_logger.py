@@ -138,10 +138,13 @@ class BottleneckLogger(BaseLogger):
         average_episode_return = np.mean(self.done_episodes_rewards)
         average_episode_step = np.mean(self.done_episode_lens)
 
-        self.writter.add_scalars(
-            "average_collision_rate",
-            {"average_collision_rate": average_collision_rate},
-            self.total_num_steps,
+        # self.writter.add_scalars(
+        #     "average_collision_rate",
+        #     {"average_collision_rate": average_collision_rate},
+        #     self.total_num_steps,
+        # )
+        self.writter.add_scalar(
+            "average_collision_rate", average_collision_rate, self.total_num_steps
         )
         print(
             "Some episodes done, average collision rate is {}.\n".format(
@@ -149,11 +152,15 @@ class BottleneckLogger(BaseLogger):
             )
         )
 
-        self.writter.add_scalars(
-            "average_episode_length",
-            {"average_episode_length": average_episode_step},
-            self.total_num_steps,
+        # self.writter.add_scalars(
+        #     "average_episode_length",
+        #     {"average_episode_length": average_episode_step},
+        #     self.total_num_steps,
+        # )
+        self.writter.add_scalar(
+            "average_episode_length", average_episode_step, self.total_num_steps
         )
+
         print(
             "Some episodes done, average episode length is {}.\n".format(
                 average_episode_step
@@ -165,10 +172,13 @@ class BottleneckLogger(BaseLogger):
                 average_episode_return
             )
         )
-        self.writter.add_scalars(
-            "train_episode_rewards",
-            {"aver_rewards": average_episode_return},
-            self.total_num_steps,
+        # self.writter.add_scalars(
+        #     "train_episode_rewards",
+        #     {"aver_rewards": average_episode_return},
+        #     self.total_num_steps,
+        # )
+        self.writter.add_scalar(
+            "train_episode_rewards", average_episode_return, self.total_num_steps
         )
 
         # 记录每个episode的平均 step reward
@@ -179,10 +189,13 @@ class BottleneckLogger(BaseLogger):
                 critic_train_info["average_step_rewards"]
             )
         )
-        self.writter.add_scalars(
-            "average_step_rewards",
-            {"average_step_rewards": critic_train_info["average_step_rewards"]},
-            self.total_num_steps,
+        # self.writter.add_scalars(
+        #     "average_step_rewards",
+        #     {"average_step_rewards": critic_train_info["average_step_rewards"]},
+        #     self.total_num_steps,
+        # )
+        self.writter.add_scalar(
+            "average_step_rewards", critic_train_info["average_step_rewards"], self.total_num_steps
         )
 
         if average_collision_rate <= save_collision and average_episode_step <= save_episode_step:
